@@ -53,13 +53,22 @@ struct boid_t
 {
     vector_t location;
     vector_t velocity;
+    sf::Color color;
 };
+
+template <class T>
+T create(const action_t<T&>& init)
+{
+    T result{};
+    init(result);
+    return result;
+}
 
 int main()
 {
     std::vector<boid_t> boids;
-    boids.push_back(boid_t{ { 0, 0 }, { 50, 1 } });
-    boids.push_back(boid_t{ { 50, 1000 }, { 40, -2 } });
+    boids.push_back(boid_t{ { 0, 0 }, { 50, 50 }, sf::Color::Red });
+    boids.push_back(boid_t{ { 50, 1000 }, { 40, -2 }, sf::Color::Green });
     auto window = sf::RenderWindow{ { 1920u, 1080u }, "CMake SFML Project" };
     run(
         window,
@@ -79,18 +88,18 @@ int main()
         },
         [&](float dt)
         {
-            const float scale = 100.F;
+            const float scale = 50.F;
             for (auto& b : boids)
             {
                 for (std::size_t i = 0; i < 2; ++i)
                 {
                     b.location[i] += b.velocity[i] * dt * scale;
                 }
-                if (b.location[0] > window.getView().getSize().x ||  b.location[0] < 0)
+                if (b.location[0] > window.getView().getSize().x || b.location[0] < 0)
                 {
                     b.velocity[0] *= -1;
                 }
-                if (b.location[1] > window.getView().getSize().y ||  b.location[1] < 0)
+                if (b.location[1] > window.getView().getSize().y || b.location[1] < 0)
                 {
                     b.velocity[1] *= -1;
                 }
@@ -100,10 +109,13 @@ int main()
         {
             for (const auto& b : boids)
             {
-                sf::CircleShape shape(10.f);
-                shape.setPosition(sf::Vector2f{ b.location[0], b.location[1] });
-                shape.setFillColor(sf::Color::Green);
-                w.draw(shape);
+                w.draw(create<sf::CircleShape>(
+                    [&](auto& it)
+                    {
+                        it.setRadius(10.F);
+                        it.setPosition(sf::Vector2f{ b.location[0], b.location[1] });
+                        it.setFillColor(b.color);
+                    }));
             }
         },
         0.01F);
