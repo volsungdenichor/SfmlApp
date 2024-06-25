@@ -1,6 +1,24 @@
 #include <SFML/Graphics.hpp>
 #include <SFML/Window.hpp>
+#include <ferrugo/core/format.hpp>
+#include <ferrugo/core/pipeline.hpp>
 #include <functional>
+
+namespace ferrugo::core
+{
+template <class T>
+struct formatter<sf::Vector2<T>>
+{
+    void parse(const parse_context& ctx)
+    {
+    }
+
+    void format(const format_context& ctx, const sf::Vector2<T>& item)
+    {
+    }
+};
+
+}  // namespace ferrugo::core
 
 template <class... Args>
 using action_t = std::function<void(Args...)>;
@@ -47,12 +65,10 @@ void run(
     }
 }
 
-using vector_t = std::array<float, 2>;
-
 struct boid_t
 {
-    vector_t location;
-    vector_t velocity;
+    sf::Vector2f location;
+    sf::Vector2f velocity;
     sf::Color color;
 };
 
@@ -67,9 +83,11 @@ T create(const action_t<T&>& init)
 int main()
 {
     std::vector<boid_t> boids;
-    boids.push_back(boid_t{ { 0, 0 }, { 50, 50 }, sf::Color::Red });
-    boids.push_back(boid_t{ { 50, 1000 }, { 40, -2 }, sf::Color::Green });
+    boids.push_back(boid_t{ sf::Vector2f{ 0, 0 }, sf::Vector2f{ 50, 50 }, sf::Color::Red });
+    boids.push_back(boid_t{ sf::Vector2f{ 50, 1000 }, sf::Vector2f{ 40, -2 }, sf::Color::Green });
     auto window = sf::RenderWindow{ { 1920u, 1080u }, "CMake SFML Project" };
+
+    ferrugo::core::print("{}")(window.getSize());
     run(
         window,
         [&](const sf::Event& event)
@@ -91,17 +109,16 @@ int main()
             const float scale = 50.F;
             for (auto& b : boids)
             {
-                for (std::size_t i = 0; i < 2; ++i)
+                b.location.x += b.velocity.x * dt * scale;
+                b.location.y += b.velocity.y * dt * scale;
+
+                if (b.location.x > window.getView().getSize().x || b.location.x < 0)
                 {
-                    b.location[i] += b.velocity[i] * dt * scale;
+                    b.velocity.x *= -1;
                 }
-                if (b.location[0] > window.getView().getSize().x || b.location[0] < 0)
+                if (b.location.y > window.getView().getSize().y || b.location.y < 0)
                 {
-                    b.velocity[0] *= -1;
-                }
-                if (b.location[1] > window.getView().getSize().y || b.location[1] < 0)
-                {
-                    b.velocity[1] *= -1;
+                    b.velocity.y *= -1;
                 }
             }
         },
@@ -113,7 +130,7 @@ int main()
                     [&](auto& it)
                     {
                         it.setRadius(10.F);
-                        it.setPosition(sf::Vector2f{ b.location[0], b.location[1] });
+                        it.setPosition(b.location);
                         it.setFillColor(b.color);
                     }));
             }
