@@ -99,15 +99,19 @@ struct vec : std::array<float, 2>
 
     friend vec operator-(vec item)
     {
-        item[0] = -item[0];
-        item[1] = -item[1];
+        for (std::size_t i = 0; i < 2; ++i)
+        {
+            item[i] = -item[i];
+        }
         return item;
     }
 
     friend vec& operator*=(vec& lhs, float rhs)
     {
-        lhs[0] *= rhs;
-        lhs[1] *= rhs;
+        for (std::size_t i = 0; i < 2; ++i)
+        {
+            lhs[i] *= rhs;
+        }
         return lhs;
     }
 
@@ -118,8 +122,10 @@ struct vec : std::array<float, 2>
 
     friend vec& operator/=(vec& lhs, float rhs)
     {
-        lhs[0] /= rhs;
-        lhs[1] /= rhs;
+        for (std::size_t i = 0; i < 2; ++i)
+        {
+            lhs[i] /= rhs;
+        }
         return lhs;
     }
 
@@ -135,8 +141,10 @@ struct vec : std::array<float, 2>
 
     friend vec& operator+=(vec& lhs, const vec& rhs)
     {
-        lhs[0] += rhs[0];
-        lhs[1] += rhs[1];
+        for (std::size_t i = 0; i < 2; ++i)
+        {
+            lhs[i] += rhs[i];
+        }
         return lhs;
     }
 
@@ -147,8 +155,10 @@ struct vec : std::array<float, 2>
 
     friend vec& operator-=(vec& lhs, const vec& rhs)
     {
-        lhs[0] -= rhs[0];
-        lhs[1] -= rhs[1];
+        for (std::size_t i = 0; i < 2; ++i)
+        {
+            lhs[i] -= rhs[i];
+        }
         return lhs;
     }
 
