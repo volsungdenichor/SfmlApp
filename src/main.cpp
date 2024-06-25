@@ -13,8 +13,9 @@ struct formatter<sf::Vector2<T>>
     {
     }
 
-    void format(const format_context& ctx, const sf::Vector2<T>& item)
+    void format(format_context& ctx, const sf::Vector2<T>& item)
     {
+        write_to(ctx, "[", item.x, ", ", item.y, "]");
     }
 };
 
@@ -65,11 +66,103 @@ void run(
     }
 }
 
+struct vec : std::array<float, 2>
+{
+    using base_t = std::array<float, 2>;
+    vec(float x, float y) : base_t{ { x, y } }
+    {
+    }
+
+    vec() : vec(0.F, 0.F)
+    {
+    }
+
+    float x() const
+    {
+        return (*this)[0];
+    }
+
+    float y() const
+    {
+        return (*this)[1];
+    }
+
+    operator sf::Vector2f() const
+    {
+        return sf::Vector2f(x(), y());
+    }
+
+    friend vec operator+(const vec& item)
+    {
+        return item;
+    }
+
+    friend vec operator-(vec item)
+    {
+        item[0] = -item[0];
+        item[1] = -item[1];
+        return item;
+    }
+
+    friend vec& operator*=(vec& lhs, float rhs)
+    {
+        lhs[0] *= rhs;
+        lhs[1] *= rhs;
+        return lhs;
+    }
+
+    friend vec operator*(vec lhs, float rhs)
+    {
+        return lhs *= rhs;
+    }
+
+    friend vec& operator/=(vec& lhs, float rhs)
+    {
+        lhs[0] /= rhs;
+        lhs[1] /= rhs;
+        return lhs;
+    }
+
+    friend vec operator/(vec lhs, float rhs)
+    {
+        return lhs /= rhs;
+    }
+
+    friend vec operator*(float lhs, const vec& rhs)
+    {
+        return rhs * lhs;
+    }
+
+    friend vec& operator+=(vec& lhs, const vec& rhs)
+    {
+        lhs[0] += rhs[0];
+        lhs[1] += rhs[1];
+        return lhs;
+    }
+
+    friend vec operator+(vec lhs, const vec& rhs)
+    {
+        return lhs += rhs;
+    }
+
+    friend vec& operator-=(vec& lhs, const vec& rhs)
+    {
+        lhs[0] -= rhs[0];
+        lhs[1] -= rhs[1];
+        return lhs;
+    }
+
+    friend vec operator-(vec lhs, const vec& rhs)
+    {
+        return lhs -= rhs;
+    }
+};
+
 struct boid_t
 {
-    sf::Vector2f location;
-    sf::Vector2f velocity;
-    sf::Color color;
+    vec location = {};
+    vec velocity = {};
+    sf::Color color = sf::Color::White;
 };
 
 template <class T>
@@ -82,12 +175,34 @@ T create(const action_t<T&>& init)
 
 int main()
 {
-    std::vector<boid_t> boids;
-    boids.push_back(boid_t{ sf::Vector2f{ 0, 0 }, sf::Vector2f{ 50, 50 }, sf::Color::Red });
-    boids.push_back(boid_t{ sf::Vector2f{ 50, 1000 }, sf::Vector2f{ 40, -2 }, sf::Color::Green });
+    std::vector<boid_t> boids = { create<boid_t>(
+                                      [](auto& it)
+                                      {
+                                          it.location = vec(0, 0);
+                                          it.velocity = vec(50, 75);
+                                          it.color = sf::Color::Red;
+                                      }),
+                                  create<boid_t>(
+                                      [](auto& it)
+                                      {
+                                          it.location = vec(50, 1000);
+                                          it.velocity = vec(40, -10);
+                                          it.color = sf::Color::Green;
+                                      }),
+                                  create<boid_t>(
+                                      [](auto& it)
+                                      {
+                                          it.location = vec(500, 100);
+                                          it.velocity = vec(-40, 20);
+                                          it.color = sf::Color::Yellow;
+                                      })
+
+    };
+
     auto window = sf::RenderWindow{ { 1920u, 1080u }, "CMake SFML Project" };
 
-    ferrugo::core::print("{}")(window.getSize());
+    ferrugo::core::println("size={}")(window.getSize());
+
     run(
         window,
         [&](const sf::Event& event)
@@ -106,19 +221,18 @@ int main()
         },
         [&](float dt)
         {
-            const float scale = 50.F;
+            static const float scale = 20.F;
             for (auto& b : boids)
             {
-                b.location.x += b.velocity.x * dt * scale;
-                b.location.y += b.velocity.y * dt * scale;
+                b.location += b.velocity * dt * scale;
 
-                if (b.location.x > window.getView().getSize().x || b.location.x < 0)
+                if (b.location.x() > window.getView().getSize().x || b.location.x() < 0)
                 {
-                    b.velocity.x *= -1;
+                    b.velocity = vec(-b.velocity.x(), b.velocity.y());
                 }
-                if (b.location.y > window.getView().getSize().y || b.location.y < 0)
+                if (b.location.y() > window.getView().getSize().y || b.location.y() < 0)
                 {
-                    b.velocity.y *= -1;
+                    b.velocity = vec(b.velocity.x(), -b.velocity.y());
                 }
             }
         },
