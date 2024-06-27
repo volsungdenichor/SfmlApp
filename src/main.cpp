@@ -24,7 +24,7 @@ void run_app(
     sf::RenderWindow& window,
     const action_t<const sf::Event&>& event_handler,
     const action_t<float>& updater,
-    const applier_t<sf::RenderWindow>& renderer,
+    const action_t<sf::RenderWindow&, float>& renderer,
     float time_per_frame)
 {
     sf::Clock clock;
@@ -57,7 +57,7 @@ void run_app(
         }
 
         window.clear();
-        renderer(window);
+        renderer(window, fps);
         window.display();
     }
 }
@@ -188,7 +188,7 @@ struct widget_impl
 
     virtual void set_texture(const sf::Texture* texture, const sf::IntRect& rect) = 0;
 
-    virtual void set_text(const applier_t<sf::String>& text, const sf::Font& font) = 0;
+    virtual void set_text(const applier_t<sf::String>& text, const sf::Font& font, const applier_t<unsigned int>& size) = 0;
 };
 
 template <class S>
@@ -258,7 +258,7 @@ struct shape_widget : widget_impl
         m_inner.setTextureRect(rect);
     }
 
-    void set_text(const applier_t<sf::String>& text, const sf::Font& font) override
+    void set_text(const applier_t<sf::String>& text, const sf::Font& font, const applier_t<unsigned int>& size) override
     {
     }
 };
@@ -314,7 +314,7 @@ struct sprite_widget : widget_impl
         m_inner.setTextureRect(rect);
     }
 
-    void set_text(const applier_t<sf::String>& text, const sf::Font& font) override
+    void set_text(const applier_t<sf::String>& text, const sf::Font& font, const applier_t<unsigned int>& size) override
     {
     }
 };
@@ -383,12 +383,19 @@ struct text_widget : widget_impl
     {
     }
 
-    void set_text(const applier_t<sf::String>& text, const sf::Font& font) override
+    void set_text(const applier_t<sf::String>& text, const sf::Font& font, const applier_t<unsigned int>& size) override
     {
-        sf::String v = m_inner.getString();
-        text(v);
-        m_inner.setString(v);
+        {
+            sf::String v = m_inner.getString();
+            text(v);
+            m_inner.setString(v);
+        }
         m_inner.setFont(font);
+        {
+            auto v = m_inner.getCharacterSize();
+            size(v);
+            m_inner.setCharacterSize(v);
+        }
     }
 };
 
@@ -446,9 +453,9 @@ struct widget_t
         m_ptr->set_texture(texture, rect);
     }
 
-    void set_text(const applier_t<sf::String>& text, const sf::Font& font)
+    void set_text(const applier_t<sf::String>& text, const sf::Font& font, const applier_t<unsigned int>& size)
     {
-        m_ptr->set_text(text, font);
+        m_ptr->set_text(text, font, size);
     }
 };
 
@@ -458,8 +465,8 @@ auto set_value(T v) -> applier_t<T>
     return [=](T& out) { out = v; };
 }
 
-using drawable = action_t<sf::RenderTarget&>;
-using widget_modifier_t = action_t<widget_t&>;
+using drawable_t = applier_t<sf::RenderTarget>;
+using widget_modifier_t = applier_t<widget_t>;
 
 auto rect(float w, float h) -> widget_t
 {
@@ -489,10 +496,10 @@ auto sprite(const sf::Texture& texture, const sf::IntRect& rect) -> widget_t
     return result;
 }
 
-auto text(const sf::String& str, const sf::Font& font)
+auto text(const sf::String& str, const sf::Font& font, unsigned int size)
 {
     widget_t result = widget_t::create<text_widget>();
-    result.set_text(set_value(str), font);
+    result.set_text(set_value(str), font, set_value(size));
     return result;
 }
 
@@ -622,7 +629,8 @@ void run()
         = [](const boid_t& b) -> widget_t { return circle(10.F) | position(b.location) | fill(b.color); };
 
     const sf::Texture txt = load_texture(R"(/mnt/d/Users/Krzysiek/Pictures/conan.bmp)");
-    const sf::Font fnt = load_font(R"(/mnt/c/Windows/Fonts/arial.ttf)");
+    const sf::Font arial = load_font(R"(/mnt/c/Windows/Fonts/arial.ttf)");
+    const sf::Font verdana = load_font(R"(/mnt/c/Windows/Fonts/verdana.ttf)");
 
     run_app(
         window,
@@ -658,9 +666,9 @@ void run()
                 }
             }
         },
-        [&](sf::RenderWindow& w)
+        [&](sf::RenderWindow& w, float fps)
         {
-            std::vector<drawable> drawables;
+            std::vector<drawable_t> drawables;
             drawables.push_back(circle(200) | fill(sf::Color::Yellow) | outline(sf::Color::Red) | outline_thickness(5.0));
             drawables.push_back(
                 rect(50.F, 20.F) | fill(sf::Color::Red) | outline(sf::Color::Yellow) | position({ 100, 50 }) | rotate(45.F));
@@ -679,8 +687,10 @@ void run()
             drawables.push_back(circle(200.0) | texture(&txt, sf::IntRect{ 40, 10, 200, 200 }) | position({ 500, 100 }));
             drawables.push_back(sprite(txt, sf::IntRect{ 40, 10, 200, 200 }));
             drawables.push_back(
-                text("Hello World!", fnt) | outline(sf::Color::White) | fill(sf::Color::Red) | outline_thickness(1.F)
+                text("Hello World!", arial, 24) | outline(sf::Color::White) | fill(sf::Color::Red) | outline_thickness(1.F)
                 | position({ 1200, 400 }));
+
+            drawables.push_back(text("fps = " + std::to_string(fps), verdana, 12) | fill(sf::Color::White) | position({ 1200, 100 }));
 
             for (const auto& d : drawables)
             {
