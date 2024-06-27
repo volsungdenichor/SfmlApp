@@ -1,6 +1,7 @@
 #include <SFML/Graphics.hpp>
 #include <SFML/Window.hpp>
 #include <functional>
+#include <iostream>
 #include <memory>
 
 struct do_nothing_fn
@@ -19,7 +20,7 @@ using action_t = std::function<void(Args...)>;
 template <class T>
 using applier_t = action_t<T&>;
 
-void run(
+void run_app(
     sf::RenderWindow& window,
     const action_t<const sf::Event&>& event_handler,
     const action_t<float>& updater,
@@ -61,19 +62,19 @@ void run(
     }
 }
 
-struct vec : std::array<float, 2>
+struct vec_t : std::array<float, 2>
 {
     using base_t = std::array<float, 2>;
 
-    vec(float x, float y) : base_t{ { x, y } }
+    vec_t(float x, float y) : base_t{ { x, y } }
     {
     }
 
-    vec(const sf::Vector2f& v) : vec(v.x, v.y)
+    vec_t(const sf::Vector2f& v) : vec_t(v.x, v.y)
     {
     }
 
-    vec() : vec(0.F, 0.F)
+    vec_t() : vec_t(0.F, 0.F)
     {
     }
 
@@ -92,12 +93,12 @@ struct vec : std::array<float, 2>
         return sf::Vector2f(x(), y());
     }
 
-    friend vec operator+(const vec& item)
+    friend vec_t operator+(const vec_t& item)
     {
         return item;
     }
 
-    friend vec operator-(vec item)
+    friend vec_t operator-(vec_t item)
     {
         for (std::size_t i = 0; i < 2; ++i)
         {
@@ -106,7 +107,7 @@ struct vec : std::array<float, 2>
         return item;
     }
 
-    friend vec& operator*=(vec& lhs, float rhs)
+    friend vec_t& operator*=(vec_t& lhs, float rhs)
     {
         for (std::size_t i = 0; i < 2; ++i)
         {
@@ -115,12 +116,12 @@ struct vec : std::array<float, 2>
         return lhs;
     }
 
-    friend vec operator*(vec lhs, float rhs)
+    friend vec_t operator*(vec_t lhs, float rhs)
     {
         return lhs *= rhs;
     }
 
-    friend vec& operator/=(vec& lhs, float rhs)
+    friend vec_t& operator/=(vec_t& lhs, float rhs)
     {
         for (std::size_t i = 0; i < 2; ++i)
         {
@@ -129,17 +130,17 @@ struct vec : std::array<float, 2>
         return lhs;
     }
 
-    friend vec operator/(vec lhs, float rhs)
+    friend vec_t operator/(vec_t lhs, float rhs)
     {
         return lhs /= rhs;
     }
 
-    friend vec operator*(float lhs, const vec& rhs)
+    friend vec_t operator*(float lhs, const vec_t& rhs)
     {
         return rhs * lhs;
     }
 
-    friend vec& operator+=(vec& lhs, const vec& rhs)
+    friend vec_t& operator+=(vec_t& lhs, const vec_t& rhs)
     {
         for (std::size_t i = 0; i < 2; ++i)
         {
@@ -148,12 +149,12 @@ struct vec : std::array<float, 2>
         return lhs;
     }
 
-    friend vec operator+(vec lhs, const vec& rhs)
+    friend vec_t operator+(vec_t lhs, const vec_t& rhs)
     {
         return lhs += rhs;
     }
 
-    friend vec& operator-=(vec& lhs, const vec& rhs)
+    friend vec_t& operator-=(vec_t& lhs, const vec_t& rhs)
     {
         for (std::size_t i = 0; i < 2; ++i)
         {
@@ -162,7 +163,7 @@ struct vec : std::array<float, 2>
         return lhs;
     }
 
-    friend vec operator-(vec lhs, const vec& rhs)
+    friend vec_t operator-(vec_t lhs, const vec_t& rhs)
     {
         return lhs -= rhs;
     }
@@ -175,7 +176,8 @@ struct widget_impl
     virtual ~widget_impl() = default;
     virtual std::unique_ptr<widget_impl> clone() const = 0;
     virtual void draw(sf::RenderTarget& window, sf::RenderStates states) const = 0;
-    virtual void set_geometry(const applier_t<vec>& position, const applier_t<vec>& scale, const applier_t<float>& rotation)
+    virtual void set_geometry(
+        const applier_t<vec_t>& position, const applier_t<vec_t>& scale, const applier_t<float>& rotation)
         = 0;
 
     virtual void set_style(
@@ -183,6 +185,10 @@ struct widget_impl
         const applier_t<sf::Color>& outline_color,
         const applier_t<float>& outline_thickness)
         = 0;
+
+    virtual void set_texture(const sf::Texture* texture, const sf::IntRect& rect) = 0;
+
+    virtual void set_text(const applier_t<sf::String>& text, const sf::Font& font) = 0;
 };
 
 template <class S>
@@ -204,15 +210,16 @@ struct shape_widget : widget_impl
         window.draw(m_inner, states);
     }
 
-    void set_geometry(const applier_t<vec>& position, const applier_t<vec>& scale, const applier_t<float>& rotation) override
+    void set_geometry(
+        const applier_t<vec_t>& position, const applier_t<vec_t>& scale, const applier_t<float>& rotation) override
     {
         {
-            vec v(m_inner.getPosition());
+            vec_t v(m_inner.getPosition());
             position(v);
             m_inner.setPosition(v);
         }
         {
-            vec v(m_inner.getScale());
+            vec_t v(m_inner.getScale());
             scale(v);
             m_inner.setScale(v);
         }
@@ -243,6 +250,145 @@ struct shape_widget : widget_impl
             outline_thickness(v);
             m_inner.setOutlineThickness(v);
         }
+    }
+
+    void set_texture(const sf::Texture* texture, const sf::IntRect& rect) override
+    {
+        m_inner.setTexture(texture);
+        m_inner.setTextureRect(rect);
+    }
+
+    void set_text(const applier_t<sf::String>& text, const sf::Font& font) override
+    {
+    }
+};
+
+struct sprite_widget : widget_impl
+{
+    sf::Sprite m_inner;
+
+    explicit sprite_widget(sf::Sprite inner = {}) : m_inner(std::move(inner))
+    {
+    }
+
+    std::unique_ptr<widget_impl> clone() const
+    {
+        return std::make_unique<sprite_widget>(m_inner);
+    }
+
+    void draw(sf::RenderTarget& window, sf::RenderStates states) const
+    {
+        window.draw(m_inner, states);
+    }
+
+    void set_geometry(
+        const applier_t<vec_t>& position, const applier_t<vec_t>& scale, const applier_t<float>& rotation) override
+    {
+        {
+            vec_t v(m_inner.getPosition());
+            position(v);
+            m_inner.setPosition(v);
+        }
+        {
+            vec_t v(m_inner.getScale());
+            scale(v);
+            m_inner.setScale(v);
+        }
+        {
+            float r = m_inner.getRotation();
+            rotation(r);
+            m_inner.setRotation(r);
+        }
+    }
+
+    void set_style(
+        const applier_t<sf::Color>& fill_color,
+        const applier_t<sf::Color>& outline_color,
+        const applier_t<float>& outline_thickness) override
+    {
+    }
+
+    void set_texture(const sf::Texture* texture, const sf::IntRect& rect)
+    {
+        m_inner.setTexture(*texture);
+        m_inner.setTextureRect(rect);
+    }
+
+    void set_text(const applier_t<sf::String>& text, const sf::Font& font) override
+    {
+    }
+};
+
+struct text_widget : widget_impl
+{
+    sf::Text m_inner;
+
+    explicit text_widget(sf::Text inner = {}) : m_inner(std::move(inner))
+    {
+    }
+
+    std::unique_ptr<widget_impl> clone() const
+    {
+        return std::make_unique<text_widget>(m_inner);
+    }
+
+    void draw(sf::RenderTarget& window, sf::RenderStates states) const
+    {
+        window.draw(m_inner, states);
+    }
+
+    void set_geometry(
+        const applier_t<vec_t>& position, const applier_t<vec_t>& scale, const applier_t<float>& rotation) override
+    {
+        {
+            vec_t v(m_inner.getPosition());
+            position(v);
+            m_inner.setPosition(v);
+        }
+        {
+            vec_t v(m_inner.getScale());
+            scale(v);
+            m_inner.setScale(v);
+        }
+        {
+            float r = m_inner.getRotation();
+            rotation(r);
+            m_inner.setRotation(r);
+        }
+    }
+
+    void set_style(
+        const applier_t<sf::Color>& fill_color,
+        const applier_t<sf::Color>& outline_color,
+        const applier_t<float>& outline_thickness) override
+    {
+        {
+            sf::Color v = m_inner.getFillColor();
+            fill_color(v);
+            m_inner.setFillColor(v);
+        }
+        {
+            sf::Color v = m_inner.getOutlineColor();
+            outline_color(v);
+            m_inner.setOutlineColor(v);
+        }
+        {
+            float v = m_inner.getOutlineThickness();
+            outline_thickness(v);
+            m_inner.setOutlineThickness(v);
+        }
+    }
+
+    void set_texture(const sf::Texture* texture, const sf::IntRect& rect)
+    {
+    }
+
+    void set_text(const applier_t<sf::String>& text, const sf::Font& font) override
+    {
+        sf::String v = m_inner.getString();
+        text(v);
+        m_inner.setString(v);
+        m_inner.setFont(font);
     }
 };
 
@@ -282,7 +428,7 @@ struct widget_t
         draw(window, sf::RenderStates::Default);
     }
 
-    void set_geometry(const applier_t<vec>& position, const applier_t<vec>& scale, const applier_t<float>& rotation)
+    void set_geometry(const applier_t<vec_t>& position, const applier_t<vec_t>& scale, const applier_t<float>& rotation)
     {
         m_ptr->set_geometry(position, scale, rotation);
     }
@@ -293,6 +439,16 @@ struct widget_t
         const applier_t<float>& outline_thickness)
     {
         m_ptr->set_style(fill_color, outline_color, outline_thickness);
+    }
+
+    void set_texture(const sf::Texture* texture, const sf::IntRect& rect)
+    {
+        m_ptr->set_texture(texture, rect);
+    }
+
+    void set_text(const applier_t<sf::String>& text, const sf::Font& font)
+    {
+        m_ptr->set_text(text, font);
     }
 };
 
@@ -315,7 +471,7 @@ auto circle(float r) -> widget_t
     return widget_t::create<shape_widget<sf::CircleShape>>(sf::CircleShape(r));
 }
 
-auto polygon(const std::vector<vec>& v) -> widget_t
+auto polygon(const std::vector<vec_t>& v) -> widget_t
 {
     sf::ConvexShape sh(v.size());
     for (std::size_t i = 0; i < v.size(); ++i)
@@ -326,13 +482,27 @@ auto polygon(const std::vector<vec>& v) -> widget_t
     return widget_t::create<shape_widget<sf::ConvexShape>>(std::move(sh));
 }
 
+auto sprite(const sf::Texture& texture, const sf::IntRect& rect) -> widget_t
+{
+    widget_t result = widget_t::create<sprite_widget>();
+    result.set_texture(&texture, rect);
+    return result;
+}
+
+auto text(const sf::String& str, const sf::Font& font)
+{
+    widget_t result = widget_t::create<text_widget>();
+    result.set_text(set_value(str), font);
+    return result;
+}
+
 auto operator|(widget_t lhs, widget_modifier_t rhs) -> widget_t
 {
     rhs(lhs);
     return lhs;
 }
 
-auto position(vec v) -> widget_modifier_t
+auto position(vec_t v) -> widget_modifier_t
 {
     return [=](widget_t& w) { w.set_geometry(set_value(std::move(v)), do_nothing, do_nothing); };
 }
@@ -355,6 +525,11 @@ auto outline_thickness(float v) -> widget_modifier_t
 auto rotate(float a) -> widget_modifier_t
 {
     return [=](widget_t& w) { w.set_geometry(do_nothing, do_nothing, set_value(a)); };
+}
+
+auto texture(const sf::Texture* texture, const sf::IntRect& rect)
+{
+    return [=](widget_t& w) { w.set_texture(texture, rect); };
 }
 
 auto operator|(widget_modifier_t lhs, widget_modifier_t rhs) -> widget_modifier_t
@@ -381,8 +556,8 @@ auto all(Args&&... args) -> widget_modifier_t
 
 struct boid_t
 {
-    vec location = {};
-    vec velocity = {};
+    vec_t location = {};
+    vec_t velocity = {};
     sf::Color color = sf::Color::White;
 };
 
@@ -394,28 +569,48 @@ T create(const action_t<T&>& init)
     return result;
 }
 
-int main()
+sf::Texture load_texture(const std::string& path)
+{
+    sf::Texture result{};
+    if (!result.loadFromFile(path))
+    {
+        throw std::runtime_error{ "Unable to load texture from " + path };
+    }
+    return result;
+}
+
+sf::Font load_font(const std::string& path)
+{
+    sf::Font result{};
+    if (!result.loadFromFile(path))
+    {
+        throw std::runtime_error{ "Unable to load font from " + path };
+    }
+    return result;
+}
+
+void run()
 {
     float angle = 0.F;
     std::vector<boid_t> boids = { create<boid_t>(
                                       [](auto& it)
                                       {
-                                          it.location = vec(0, 0);
-                                          it.velocity = vec(50, 75);
+                                          it.location = vec_t(0, 0);
+                                          it.velocity = vec_t(50, 75);
                                           it.color = sf::Color::Red;
                                       }),
                                   create<boid_t>(
                                       [](auto& it)
                                       {
-                                          it.location = vec(50, 1000);
-                                          it.velocity = vec(40, -10);
+                                          it.location = vec_t(50, 1000);
+                                          it.velocity = vec_t(40, -10);
                                           it.color = sf::Color::Green;
                                       }),
                                   create<boid_t>(
                                       [](auto& it)
                                       {
-                                          it.location = vec(500, 100);
-                                          it.velocity = vec(-40, 20);
+                                          it.location = vec_t(500, 100);
+                                          it.velocity = vec_t(-40, 20);
                                           it.color = sf::Color::Yellow;
                                       })
 
@@ -423,7 +618,13 @@ int main()
 
     auto window = sf::RenderWindow{ { 1920u, 1080u }, "CMake SFML Project" };
 
-    run(
+    static const auto render_boid
+        = [](const boid_t& b) -> widget_t { return circle(10.F) | position(b.location) | fill(b.color); };
+
+    const sf::Texture txt = load_texture(R"(/mnt/d/Users/Krzysiek/Pictures/conan.bmp)");
+    const sf::Font fnt = load_font(R"(/mnt/c/Windows/Fonts/arial.ttf)");
+
+    run_app(
         window,
         [&](const sf::Event& event)
         {
@@ -449,40 +650,54 @@ int main()
 
                 if (b.location.x() > window.getView().getSize().x || b.location.x() < 0)
                 {
-                    b.velocity = vec(-b.velocity.x(), b.velocity.y());
+                    b.velocity = vec_t(-b.velocity.x(), b.velocity.y());
                 }
                 if (b.location.y() > window.getView().getSize().y || b.location.y() < 0)
                 {
-                    b.velocity = vec(b.velocity.x(), -b.velocity.y());
+                    b.velocity = vec_t(b.velocity.x(), -b.velocity.y());
                 }
             }
         },
         [&](sf::RenderWindow& w)
         {
-            for (const auto& b : boids)
-            {
-                w.draw(create<sf::CircleShape>(
-                    [&](auto& it)
-                    {
-                        it.setRadius(10.F);
-                        it.setPosition(b.location);
-                        it.setFillColor(b.color);
-                    }));
-            }
             std::vector<drawable> drawables;
             drawables.push_back(circle(200) | fill(sf::Color::Yellow) | outline(sf::Color::Red) | outline_thickness(5.0));
             drawables.push_back(
                 rect(50.F, 20.F) | fill(sf::Color::Red) | outline(sf::Color::Yellow) | position({ 100, 50 }) | rotate(45.F));
             drawables.push_back(circle(50.F) | fill(sf::Color::Green) | position({ 200, 50 }));
             drawables.push_back(
-                polygon({ vec(0, 0),   vec(20, 0),  vec(30, 10), vec(50, 10), vec(60, 0),  vec(80, 0),  vec(80, 20),
-                          vec(70, 30), vec(70, 50), vec(80, 60), vec(80, 80), vec(60, 80), vec(50, 70), vec(30, 70),
-                          vec(20, 80), vec(0, 80),  vec(0, 60),  vec(10, 50), vec(10, 30), vec(0, 20) })
+                polygon({ vec_t(0, 0),   vec_t(20, 0),  vec_t(30, 10), vec_t(50, 10), vec_t(60, 0),
+                          vec_t(80, 0),  vec_t(80, 20), vec_t(70, 30), vec_t(70, 50), vec_t(80, 60),
+                          vec_t(80, 80), vec_t(60, 80), vec_t(50, 70), vec_t(30, 70), vec_t(20, 80),
+                          vec_t(0, 80),  vec_t(0, 60),  vec_t(10, 50), vec_t(10, 30), vec_t(0, 20) })
                 | position({ 200, 200 }) | rotate(angle) | fill(sf::Color::Red));
+            for (const auto& b : boids)
+            {
+                drawables.push_back(render_boid(b));
+            }
+
+            drawables.push_back(circle(200.0) | texture(&txt, sf::IntRect{ 40, 10, 200, 200 }) | position({ 500, 100 }));
+            drawables.push_back(sprite(txt, sf::IntRect{ 40, 10, 200, 200 }));
+            drawables.push_back(
+                text("Hello World!", fnt) | outline(sf::Color::White) | fill(sf::Color::Red) | outline_thickness(1.F)
+                | position({ 1200, 400 }));
+
             for (const auto& d : drawables)
             {
                 d(w);
             }
         },
         0.01F);
+}
+
+int main()
+{
+    try
+    {
+        run();
+    }
+    catch (const std::exception& e)
+    {
+        std::cout << e.what() << '\n';
+    }
 }
