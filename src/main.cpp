@@ -4,49 +4,9 @@
 #include <iostream>
 #include <memory>
 
+#include "app_runner.hpp"
+#include "event_handler_t.hpp"
 #include "widget_builders.hpp"
-
-void run_app(
-    sf::RenderWindow& window,
-    const action_t<const sf::Event&>& event_handler,
-    const action_t<float>& updater,
-    const action_t<sf::RenderWindow&, float>& renderer,
-    float time_per_frame)
-{
-    sf::Clock clock;
-    auto time_since_last_update = 0.F;
-
-    sf::Event event{};
-
-    while (window.isOpen())
-    {
-        const auto elapsed = clock.restart().asSeconds();
-        time_since_last_update += elapsed;
-
-        const auto fps = 1.0F / elapsed;
-
-        while (time_since_last_update > time_per_frame)
-        {
-            time_since_last_update -= time_per_frame;
-
-            while (window.pollEvent(event))
-            {
-                if (event.type == sf::Event::Closed)
-                {
-                    window.close();
-                }
-
-                event_handler(event);
-            }
-
-            updater(time_per_frame);
-        }
-
-        window.clear();
-        renderer(window, fps);
-        window.display();
-    }
-}
 
 struct boid_t
 {
@@ -118,23 +78,19 @@ void run()
     const sf::Texture txt = load_texture(R"(/mnt/d/Users/Krzysiek/Pictures/conan.bmp)");
     const sf::Font arial = load_font(R"(/mnt/c/Windows/Fonts/arial.ttf)");
     const sf::Font verdana = load_font(R"(/mnt/c/Windows/Fonts/verdana.ttf)");
+    event_handler_t event_handler{};
+    event_handler.on_close = [](sf::RenderWindow& w) { w.close(); };
+    event_handler.on_key_pressed = [](sf::RenderWindow& w, const sf::Event::KeyEvent& e)
+    {
+        if (e.code == sf::Keyboard::Escape)
+        {
+            w.close();
+        }
+    };
 
     run_app(
         window,
-        [&](const sf::Event& event)
-        {
-            if (event.type == sf::Event::Closed)
-            {
-                window.close();
-            }
-            if (event.type == sf::Event::KeyPressed)
-            {
-                if (event.key.code == sf::Keyboard::Escape)
-                {
-                    window.close();
-                }
-            }
-        },
+        event_handler,
         [&](float dt)
         {
             angle += dt * 50.F;
@@ -178,7 +134,8 @@ void run()
                 | position({ 1200, 400 }));
 
             drawables.push_back(
-                text("fps = " + std::to_string(fps), verdana, 12) | bold() | italic() | fill(sf::Color::White) | position({ 1200, 100 }));
+                text("fps = " + std::to_string(fps), verdana, 12) | bold() | italic() | fill(sf::Color::White)
+                | position({ 1200, 100 }));
 
             for (const auto& d : drawables)
             {
