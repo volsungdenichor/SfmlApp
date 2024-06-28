@@ -56,17 +56,17 @@ inline auto position(vec_t v) -> widget_modifier_t
 
 inline auto fill(sf::Color color) -> widget_modifier_t
 {
-    return [=](widget_t& w) { w.set_style(set_value(color), do_nothing, do_nothing); };
+    return [=](widget_t& w) { w.set_fill_color(set_value(color)); };
 }
 
 inline auto outline(sf::Color color) -> widget_modifier_t
 {
-    return [=](widget_t& w) { w.set_style(do_nothing, set_value(color), do_nothing); };
+    return [=](widget_t& w) { w.set_outline_color(set_value(color)); };
 }
 
 inline auto outline_thickness(float v) -> widget_modifier_t
 {
-    return [=](widget_t& w) { w.set_style(do_nothing, do_nothing, set_value(v)); };
+    return [=](widget_t& w) { w.set_outline_thickness(set_value(v)); };
 }
 
 inline auto rotate(float a) -> widget_modifier_t

@@ -53,12 +53,19 @@ struct widget_t
         m_impl->set_rotation(applier);
     }
 
-    void set_style(
-        const applier_t<sf::Color>& fill_color,
-        const applier_t<sf::Color>& outline_color,
-        const applier_t<float>& outline_thickness)
+    void set_fill_color(const applier_t<sf::Color>& applier)
     {
-        m_impl->set_style(fill_color, outline_color, outline_thickness);
+        m_impl->set_fill_color(applier);
+    }
+
+    void set_outline_color(const applier_t<sf::Color>& applier)
+    {
+        m_impl->set_outline_color(applier);
+    }
+
+    void set_outline_thickness(const applier_t<float>& applier)
+    {
+        m_impl->set_outline_thickness(applier);
     }
 
     void set_texture(const sf::Texture* texture, const sf::IntRect& rect)

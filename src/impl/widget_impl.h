@@ -16,13 +16,9 @@ struct widget_impl
     virtual void set_position(const applier_t<vec_t>& applier) = 0;
     virtual void set_scale(const applier_t<vec_t>& applier) = 0;
     virtual void set_rotation(const applier_t<float>& applier) = 0;
-
-    virtual void set_style(
-        const applier_t<sf::Color>& fill_color,
-        const applier_t<sf::Color>& outline_color,
-        const applier_t<float>& outline_thickness)
-        = 0;
-
+    virtual void set_fill_color(const applier_t<sf::Color>& applier) = 0;
+    virtual void set_outline_color(const applier_t<sf::Color>& applier) = 0;
+    virtual void set_outline_thickness(const applier_t<float>& applier) = 0;
     virtual void set_texture(const sf::Texture* texture, const sf::IntRect& rect) = 0;
 
     virtual void set_text(const applier_t<sf::String>& text, const sf::Font& font, const applier_t<unsigned int>& size) = 0;

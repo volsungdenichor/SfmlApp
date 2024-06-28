@@ -33,6 +33,7 @@ struct sprite_widget : widget_impl
         applier(v);
         m_inner.setScale(v);
     }
+
     void set_rotation(const applier_t<float>& applier) override
     {
         float r = m_inner.getRotation();
@@ -40,10 +41,15 @@ struct sprite_widget : widget_impl
         m_inner.setRotation(r);
     }
 
-    void set_style(
-        const applier_t<sf::Color>& fill_color,
-        const applier_t<sf::Color>& outline_color,
-        const applier_t<float>& outline_thickness) override
+    void set_fill_color(const applier_t<sf::Color>& applier)
+    {
+    }
+
+    void set_outline_color(const applier_t<sf::Color>& applier)
+    {
+    }
+
+    void set_outline_thickness(const applier_t<float>& applier)
     {
     }
 
