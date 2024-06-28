@@ -171,8 +171,8 @@ void run()
                 drawables.push_back(render_boid(b));
             }
 
-            drawables.push_back(circle(200.0) | texture(&txt, sf::IntRect{ 40, 10, 200, 200 }) | position({ 500, 100 }));
-            drawables.push_back(sprite(txt, sf::IntRect{ 40, 10, 200, 200 }));
+            drawables.push_back(circle(200.0) | texture({ txt, sf::IntRect{ 40, 10, 200, 200 } }) | position({ 500, 100 }));
+            drawables.push_back(sprite({ txt, sf::IntRect{ 40, 10, 200, 200 } }));
             drawables.push_back(
                 text("Hello World!", arial, 24) | outline(sf::Color::White) | fill(sf::Color::Red) | outline_thickness(1.F)
                 | position({ 1200, 400 }));

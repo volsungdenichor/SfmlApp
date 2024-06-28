@@ -29,10 +29,10 @@ inline auto polygon(const std::vector<vec_t>& v) -> widget_t
     return widget_t::create<shape_widget<sf::ConvexShape>>(std::move(sh));
 }
 
-inline auto sprite(const sf::Texture& texture, const sf::IntRect& rect) -> widget_t
+inline auto sprite(const texture_region_t& region) -> widget_t
 {
     widget_t result = widget_t::create<sprite_widget>();
-    result.set_texture(&texture, rect);
+    result.set_texture(region);
     return result;
 }
 
@@ -74,9 +74,9 @@ inline auto rotate(float a) -> widget_modifier_t
     return [=](widget_t& w) { w.set_rotation(set_value(a)); };
 }
 
-inline auto texture(const sf::Texture* texture, const sf::IntRect& rect)
+inline auto texture(texture_region_t region) -> widget_modifier_t
 {
-    return [=](widget_t& w) { w.set_texture(texture, rect); };
+    return [=](widget_t& w) { w.set_texture(region); };
 }
 
 inline auto operator|(widget_modifier_t lhs, widget_modifier_t rhs) -> widget_modifier_t

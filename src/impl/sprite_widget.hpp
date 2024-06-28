@@ -1,6 +1,7 @@
 #pragma once
 
 #include <SFML/Graphics.hpp>
+#include <cassert>
 
 struct sprite_widget : widget_impl
 {
@@ -41,22 +42,22 @@ struct sprite_widget : widget_impl
         m_inner.setRotation(r);
     }
 
-    void set_fill_color(const applier_t<sf::Color>& applier)
+    void set_fill_color(const applier_t<sf::Color>& applier) override
     {
     }
 
-    void set_outline_color(const applier_t<sf::Color>& applier)
+    void set_outline_color(const applier_t<sf::Color>& applier) override
     {
     }
 
-    void set_outline_thickness(const applier_t<float>& applier)
+    void set_outline_thickness(const applier_t<float>& applier) override
     {
     }
 
-    void set_texture(const sf::Texture* texture, const sf::IntRect& rect)
+    void set_texture(const texture_region_t& region) override
     {
-        m_inner.setTexture(*texture);
-        m_inner.setTextureRect(rect);
+        m_inner.setTexture(region.texture.get());
+        m_inner.setTextureRect(region.rect);
     }
 
     void set_text(const applier_t<sf::String>& text, const sf::Font& font, const applier_t<unsigned int>& size) override

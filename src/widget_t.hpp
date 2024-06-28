@@ -68,9 +68,9 @@ struct widget_t
         m_impl->set_outline_thickness(applier);
     }
 
-    void set_texture(const sf::Texture* texture, const sf::IntRect& rect)
+    void set_texture(const texture_region_t& region)
     {
-        m_impl->set_texture(texture, rect);
+        m_impl->set_texture(region);
     }
 
     void set_text(const applier_t<sf::String>& text, const sf::Font& font, const applier_t<unsigned int>& size)

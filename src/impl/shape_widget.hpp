@@ -42,31 +42,31 @@ struct shape_widget : widget_impl
         m_inner.setRotation(r);
     }
 
-    void set_fill_color(const applier_t<sf::Color>& applier)
+    void set_fill_color(const applier_t<sf::Color>& applier) override
     {
         sf::Color v = m_inner.getFillColor();
         applier(v);
         m_inner.setFillColor(v);
     }
 
-    void set_outline_color(const applier_t<sf::Color>& applier)
+    void set_outline_color(const applier_t<sf::Color>& applier) override
     {
         sf::Color v = m_inner.getOutlineColor();
         applier(v);
         m_inner.setOutlineColor(v);
     }
 
-    void set_outline_thickness(const applier_t<float>& applier)
+    void set_outline_thickness(const applier_t<float>& applier) override
     {
         float v = m_inner.getOutlineThickness();
         applier(v);
         m_inner.setOutlineThickness(v);
     }
 
-    void set_texture(const sf::Texture* texture, const sf::IntRect& rect) override
+     void set_texture(const texture_region_t& region) override
     {
-        m_inner.setTexture(texture);
-        m_inner.setTextureRect(rect);
+        m_inner.setTexture(&region.texture.get());
+        m_inner.setTextureRect(region.rect);
     }
 
     void set_text(const applier_t<sf::String>& text, const sf::Font& font, const applier_t<unsigned int>& size) override

@@ -2,10 +2,16 @@
 
 #include <SFML/Graphics.hpp>
 #include <memory>
+#include <optional>
 
 #include "../defs.hpp"
 #include "../vec_t.hpp"
 
+struct texture_region_t
+{
+    std::reference_wrapper<const sf::Texture> texture;
+    sf::IntRect rect;
+};
 struct widget_impl
 {
     using ptr = std::unique_ptr<widget_impl>;
@@ -19,7 +25,7 @@ struct widget_impl
     virtual void set_fill_color(const applier_t<sf::Color>& applier) = 0;
     virtual void set_outline_color(const applier_t<sf::Color>& applier) = 0;
     virtual void set_outline_thickness(const applier_t<float>& applier) = 0;
-    virtual void set_texture(const sf::Texture* texture, const sf::IntRect& rect) = 0;
+    virtual void set_texture(const texture_region_t& region) = 0;
 
     virtual void set_text(const applier_t<sf::String>& text, const sf::Font& font, const applier_t<unsigned int>& size) = 0;
 };
