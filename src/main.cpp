@@ -1,9 +1,11 @@
 #include <SFML/Graphics.hpp>
 #include <SFML/Window.hpp>
+#include <cmath>
 #include <functional>
 #include <iostream>
 #include <memory>
 
+#include "animation.hpp"
 #include "app_runner.hpp"
 #include "event_handler_t.hpp"
 #include "widget_builders.hpp"
@@ -45,7 +47,15 @@ sf::Font load_font(const std::string& path)
 
 void run()
 {
+    const auto anim = repeat(
+        sequence(
+            gradual(0.F, 200.F, duration_t{ 10.F }, ease::cubic_out),
+            constant(200.F, duration_t{ 10.F }),
+            gradual(200.F, 0.F, duration_t{ 5.F }, ease::cubic_in)),
+        3.F);
+
     float angle = 0.F;
+    float anim_time = 0.F;
     std::vector<boid_t> boids = { create<boid_t>(
                                       [](auto& it)
                                       {
@@ -103,6 +113,7 @@ void run()
         event_handler,
         [&](float dt)
         {
+            anim_time += dt * 10.F;
             angle += dt * 50.F;
             static const float scale = 20.F;
             for (auto& b : boids)
@@ -146,6 +157,8 @@ void run()
             drawables.push_back(
                 text("fps = " + std::to_string(fps), verdana, 12) | bold() | italic() | fill(sf::Color::White)
                 | position({ 1200, 100 }));
+
+            drawables.push_back(circle(10) | fill(sf::Color::White) | position({ anim(anim_time), 500 }));
 
             for (const auto& d : drawables)
             {
