@@ -1,37 +1,60 @@
 #pragma once
 
+#include <SFML/Graphics/RenderWindow.hpp>
 #include <SFML/Window.hpp>
 
 #include "defs.hpp"
-#include <SFML/Graphics/RenderWindow.hpp>
 
 struct event_handler_t
 {
     template <class... Args>
     using handler_t = action_t<sf::RenderWindow&, Args...>;
 
+    using size_handler_t = handler_t<sf::Event::SizeEvent>;
+    using key_handler_t = handler_t<sf::Event::KeyEvent>;
+    using mouse_button_handler_t = handler_t<sf::Event::MouseButtonEvent>;
+    using mouse_wheel_scroll_handler_t = handler_t<sf::Event::MouseWheelScrollEvent>;
+    using mouse_move_handler_t = handler_t<sf::Event::MouseMoveEvent>;
+    using joystick_button_handler_t = handler_t<sf::Event::JoystickButtonEvent>;
+    using joystick_move_handler_t = handler_t<sf::Event::JoystickMoveEvent>;
+    using joystick_connect_handler_t = handler_t<sf::Event::JoystickConnectEvent>;
+    using touch_handler_t = handler_t<sf::Event::TouchEvent>;
+    using text_handler_t = handler_t<sf::Event::TextEvent>;
+    using sensor_handler_t = handler_t<sf::Event::SensorEvent>;
+
     handler_t<> on_close;
     handler_t<> on_focus_lost;
     handler_t<> on_focus_gained;
     handler_t<> on_mouse_entered;
     handler_t<> on_mouse_left;
-    handler_t<sf::Event::SizeEvent> on_resized;
-    handler_t<sf::Event::KeyEvent> on_key_pressed;
-    handler_t<sf::Event::KeyEvent> on_key_released;
-    handler_t<sf::Event::MouseButtonEvent> on_mouse_button_pressed;
-    handler_t<sf::Event::MouseButtonEvent> on_mouse_button_released;
-    handler_t<sf::Event::MouseWheelScrollEvent> on_mouse_wheel_scroll;
-    handler_t<sf::Event::MouseMoveEvent> on_mouse_moved;
-    handler_t<sf::Event::JoystickButtonEvent> on_joystick_button_pressed;
-    handler_t<sf::Event::JoystickButtonEvent> on_joystick_button_released;
-    handler_t<sf::Event::JoystickMoveEvent> on_joystick_moved;
-    handler_t<sf::Event::JoystickConnectEvent> on_joystick_connected;
-    handler_t<sf::Event::JoystickConnectEvent> on_joystick_disconnected;
-    handler_t<sf::Event::TouchEvent> on_touch_began;
-    handler_t<sf::Event::TouchEvent> on_touch_ended;
-    handler_t<sf::Event::TouchEvent> on_touch_moved;
-    handler_t<sf::Event::TextEvent> on_text_entered;
-    handler_t<sf::Event::SensorEvent> on_sensor_changed;
+
+    size_handler_t on_resized;
+
+    key_handler_t on_key_pressed;
+    key_handler_t on_key_released;
+
+    mouse_button_handler_t on_mouse_button_pressed;
+    mouse_button_handler_t on_mouse_button_released;
+
+    mouse_wheel_scroll_handler_t on_mouse_wheel_scroll;
+
+    mouse_move_handler_t on_mouse_moved;
+
+    joystick_button_handler_t on_joystick_button_pressed;
+    joystick_button_handler_t on_joystick_button_released;
+
+    joystick_move_handler_t on_joystick_moved;
+
+    joystick_connect_handler_t on_joystick_connected;
+    joystick_connect_handler_t on_joystick_disconnected;
+
+    touch_handler_t on_touch_began;
+    touch_handler_t on_touch_ended;
+    touch_handler_t on_touch_moved;
+
+    text_handler_t on_text_entered;
+
+    sensor_handler_t on_sensor_changed;
 
     void operator()(sf::RenderWindow& window, const sf::Event& event) const
     {

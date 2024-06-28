@@ -80,11 +80,21 @@ void run()
     const sf::Font verdana = load_font(R"(/mnt/c/Windows/Fonts/verdana.ttf)");
     event_handler_t event_handler{};
     event_handler.on_close = [](sf::RenderWindow& w) { w.close(); };
-    event_handler.on_key_pressed = [](sf::RenderWindow& w, const sf::Event::KeyEvent& e)
+    event_handler.on_key_pressed = [&](sf::RenderWindow& w, const sf::Event::KeyEvent& e)
     {
         if (e.code == sf::Keyboard::Escape)
         {
             w.close();
+        }
+
+        if (e.code == sf::Keyboard::Num1)
+        {
+            boids[0].velocity = -boids[0].velocity;
+        }
+
+        if (e.code == sf::Keyboard::Num2)
+        {
+            boids[1].velocity = -boids[1].velocity;
         }
     };
 
