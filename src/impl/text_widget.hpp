@@ -68,18 +68,22 @@ struct text_widget : widget_impl
     {
     }
 
-    void set_text(const applier_t<sf::String>& text, const sf::Font& font, const applier_t<unsigned int>& size) override
+    void set_text(const applier_t<sf::String>& applier) override
     {
-        {
-            sf::String v = m_inner.getString();
-            text(v);
-            m_inner.setString(v);
-        }
+        sf::String v = m_inner.getString();
+        applier(v);
+        m_inner.setString(v);
+    }
+
+    void set_font(const sf::Font& font) override
+    {
         m_inner.setFont(font);
-        {
-            auto v = m_inner.getCharacterSize();
-            size(v);
-            m_inner.setCharacterSize(v);
-        }
+    }
+
+    void set_font_size(const applier_t<unsigned int>& applier) override
+    {
+        auto v = m_inner.getCharacterSize();
+        applier(v);
+        m_inner.setCharacterSize(v);
     }
 };

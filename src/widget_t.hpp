@@ -73,8 +73,18 @@ struct widget_t
         m_impl->set_texture(region);
     }
 
-    void set_text(const applier_t<sf::String>& text, const sf::Font& font, const applier_t<unsigned int>& size)
+    void set_text(const applier_t<sf::String>& applier)
     {
-        m_impl->set_text(text, font, size);
+        m_impl->set_text(applier);
+    }
+
+    void set_font(const sf::Font& font)
+    {
+        m_impl->set_font(font);
+    }
+
+    void set_font_size(const applier_t<unsigned int>& applier)
+    {
+        m_impl->set_font_size(applier);
     }
 };

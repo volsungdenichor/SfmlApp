@@ -77,7 +77,15 @@ struct shape_widget : widget_impl
         }
     }
 
-    void set_text(const applier_t<sf::String>& text, const sf::Font& font, const applier_t<unsigned int>& size) override
+    void set_text(const applier_t<sf::String>& applier) override
+    {
+    }
+
+    void set_font(const sf::Font& font) override
+    {
+    }
+
+    void set_font_size(const applier_t<unsigned int>& applier) override
     {
     }
 };

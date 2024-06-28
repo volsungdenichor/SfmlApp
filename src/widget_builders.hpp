@@ -39,7 +39,9 @@ inline auto sprite(const texture_region_t& region) -> widget_t
 inline auto text(sf::String str, const sf::Font& font, unsigned int size)
 {
     widget_t result = widget_t::create<text_widget>();
-    result.set_text(set_value(std::move(str)), font, set_value(size));
+    result.set_text(set_value(std::move(str)));
+    result.set_font(font);
+    result.set_font_size(set_value(size));
     return result;
 }
 
