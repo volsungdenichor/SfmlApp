@@ -4,15 +4,15 @@
 
 struct widget_t
 {
-    widget_impl::ptr m_ptr;
+    widget_impl::ptr m_impl;
 
-    explicit widget_t(widget_impl::ptr ptr) : m_ptr(std::move(ptr))
+    explicit widget_t(widget_impl::ptr impl) : m_impl(std::move(impl))
     {
     }
 
     widget_t(widget_t&&) = default;
 
-    widget_t(const widget_t& other) : widget_t(m_ptr->clone())
+    widget_t(const widget_t& other) : widget_t(m_impl->clone())
     {
     }
 
@@ -24,13 +24,13 @@ struct widget_t
 
     widget_t& operator=(widget_t other)
     {
-        std::swap(m_ptr, other.m_ptr);
+        std::swap(m_impl, other.m_impl);
         return *this;
     }
 
     void draw(sf::RenderTarget& window, sf::RenderStates states) const
     {
-        m_ptr->draw(window, std::move(states));
+        m_impl->draw(window, std::move(states));
     }
 
     void operator()(sf::RenderTarget& window) const
@@ -38,9 +38,19 @@ struct widget_t
         draw(window, sf::RenderStates::Default);
     }
 
-    void set_geometry(const applier_t<vec_t>& position, const applier_t<vec_t>& scale, const applier_t<float>& rotation)
+    void set_position(const applier_t<vec_t>& applier)
     {
-        m_ptr->set_geometry(position, scale, rotation);
+        m_impl->set_position(applier);
+    }
+
+    void set_scale(const applier_t<vec_t>& applier)
+    {
+        m_impl->set_scale(applier);
+    }
+
+    void set_rotation(const applier_t<float>& applier)
+    {
+        m_impl->set_rotation(applier);
     }
 
     void set_style(
@@ -48,16 +58,16 @@ struct widget_t
         const applier_t<sf::Color>& outline_color,
         const applier_t<float>& outline_thickness)
     {
-        m_ptr->set_style(fill_color, outline_color, outline_thickness);
+        m_impl->set_style(fill_color, outline_color, outline_thickness);
     }
 
     void set_texture(const sf::Texture* texture, const sf::IntRect& rect)
     {
-        m_ptr->set_texture(texture, rect);
+        m_impl->set_texture(texture, rect);
     }
 
     void set_text(const applier_t<sf::String>& text, const sf::Font& font, const applier_t<unsigned int>& size)
     {
-        m_ptr->set_text(text, font, size);
+        m_impl->set_text(text, font, size);
     }
 };

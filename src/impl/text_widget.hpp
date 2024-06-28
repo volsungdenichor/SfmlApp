@@ -22,24 +22,24 @@ struct text_widget : widget_impl
         window.draw(m_inner, states);
     }
 
-    void set_geometry(
-        const applier_t<vec_t>& position, const applier_t<vec_t>& scale, const applier_t<float>& rotation) override
+    void set_position(const applier_t<vec_t>& applier) override
     {
-        {
-            vec_t v(m_inner.getPosition());
-            position(v);
-            m_inner.setPosition(v);
-        }
-        {
-            vec_t v(m_inner.getScale());
-            scale(v);
-            m_inner.setScale(v);
-        }
-        {
-            float r = m_inner.getRotation();
-            rotation(r);
-            m_inner.setRotation(r);
-        }
+        vec_t v(m_inner.getPosition());
+        applier(v);
+        m_inner.setPosition(v);
+    }
+
+    void set_scale(const applier_t<vec_t>& applier) override
+    {
+        vec_t v(m_inner.getScale());
+        applier(v);
+        m_inner.setScale(v);
+    }
+    void set_rotation(const applier_t<float>& applier) override
+    {
+        float r = m_inner.getRotation();
+        applier(r);
+        m_inner.setRotation(r);
     }
 
     void set_style(

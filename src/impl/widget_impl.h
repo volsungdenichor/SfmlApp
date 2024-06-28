@@ -13,9 +13,9 @@ struct widget_impl
     virtual ~widget_impl() = default;
     virtual std::unique_ptr<widget_impl> clone() const = 0;
     virtual void draw(sf::RenderTarget& window, sf::RenderStates states) const = 0;
-    virtual void set_geometry(
-        const applier_t<vec_t>& position, const applier_t<vec_t>& scale, const applier_t<float>& rotation)
-        = 0;
+    virtual void set_position(const applier_t<vec_t>& applier) = 0;
+    virtual void set_scale(const applier_t<vec_t>& applier) = 0;
+    virtual void set_rotation(const applier_t<float>& applier) = 0;
 
     virtual void set_style(
         const applier_t<sf::Color>& fill_color,

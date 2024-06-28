@@ -51,7 +51,7 @@ inline auto operator|(widget_t lhs, widget_modifier_t rhs) -> widget_t
 
 inline auto position(vec_t v) -> widget_modifier_t
 {
-    return [=](widget_t& w) { w.set_geometry(set_value(std::move(v)), do_nothing, do_nothing); };
+    return [=](widget_t& w) { w.set_position(set_value(std::move(v))); };
 }
 
 inline auto fill(sf::Color color) -> widget_modifier_t
@@ -71,7 +71,7 @@ inline auto outline_thickness(float v) -> widget_modifier_t
 
 inline auto rotate(float a) -> widget_modifier_t
 {
-    return [=](widget_t& w) { w.set_geometry(do_nothing, do_nothing, set_value(a)); };
+    return [=](widget_t& w) { w.set_rotation(set_value(a)); };
 }
 
 inline auto texture(const sf::Texture* texture, const sf::IntRect& rect)
