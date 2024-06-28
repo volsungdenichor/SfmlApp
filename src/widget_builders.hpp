@@ -8,6 +8,21 @@
 using drawable_t = applier_t<sf::RenderTarget>;
 using widget_modifier_t = applier_t<widget_t>;
 
+inline auto operator|(widget_t lhs, widget_modifier_t rhs) -> widget_t
+{
+    rhs(lhs);
+    return lhs;
+}
+
+inline auto operator|(widget_modifier_t lhs, widget_modifier_t rhs) -> widget_modifier_t
+{
+    return [=](widget_t& sh)
+    {
+        lhs(sh);
+        rhs(sh);
+    };
+}
+
 inline auto rect(float w, float h) -> widget_t
 {
     return widget_t::create<shape_widget<sf::RectangleShape>>(sf::RectangleShape(sf::Vector2f(w, h)));
@@ -45,12 +60,6 @@ inline auto text(sf::String str, const sf::Font& font, unsigned int size)
     return result;
 }
 
-inline auto operator|(widget_t lhs, widget_modifier_t rhs) -> widget_t
-{
-    rhs(lhs);
-    return lhs;
-}
-
 inline auto position(vec_t v) -> widget_modifier_t
 {
     return [=](widget_t& w) { w.set_position(set_value(std::move(v))); };
@@ -81,13 +90,14 @@ inline auto texture(texture_region_t region) -> widget_modifier_t
     return [=](widget_t& w) { w.set_texture(region); };
 }
 
-inline auto operator|(widget_modifier_t lhs, widget_modifier_t rhs) -> widget_modifier_t
+inline auto bold() -> widget_modifier_t
 {
-    return [=](widget_t& sh)
-    {
-        lhs(sh);
-        rhs(sh);
-    };
+    return [](widget_t& w) { w.set_font_style([](std::uint32_t& v) { v |= sf::Text::Bold; }); };
+}
+
+inline auto italic() -> widget_modifier_t
+{
+    return [](widget_t& w) { w.set_font_style([](std::uint32_t& v) { v |= sf::Text::Italic; }); };
 }
 
 template <class... Args>

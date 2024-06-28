@@ -87,4 +87,19 @@ struct widget_t
     {
         m_impl->set_font_size(applier);
     }
+
+    void set_line_spacing(const applier_t<float>& applier)
+    {
+        m_impl->set_line_spacing(applier);
+    }
+
+    void set_letter_spacing(const applier_t<float>& applier)
+    {
+        m_impl->set_letter_spacing(applier);
+    }
+
+    void set_font_style(const applier_t<std::uint32_t>& applier)
+    {
+        m_impl->set_font_style(applier);
+    }
 };

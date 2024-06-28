@@ -82,8 +82,29 @@ struct text_widget : widget_impl
 
     void set_font_size(const applier_t<unsigned int>& applier) override
     {
-        auto v = m_inner.getCharacterSize();
+        unsigned int v = m_inner.getCharacterSize();
         applier(v);
         m_inner.setCharacterSize(v);
+    }
+
+    void set_line_spacing(const applier_t<float>& applier) override
+    {
+        float v = m_inner.getLineSpacing();
+        applier(v);
+        m_inner.setLineSpacing(v);
+    }
+
+    void set_letter_spacing(const applier_t<float>& applier) override
+    {
+        float v = m_inner.getLetterSpacing();
+        applier(v);
+        m_inner.setLetterSpacing(v);
+    }
+
+    void set_font_style(const applier_t<std::uint32_t>& applier) override
+    {
+        auto v = m_inner.getStyle();
+        applier(v);
+        m_inner.setStyle(v);
     }
 };

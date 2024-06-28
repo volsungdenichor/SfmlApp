@@ -174,11 +174,11 @@ void run()
             drawables.push_back(circle(200.0) | texture({ txt, sf::IntRect{ 40, 10, 200, 200 } }) | position({ 500, 100 }));
             drawables.push_back(sprite({ txt, sf::IntRect{ 40, 10, 200, 200 } }));
             drawables.push_back(
-                text("Hello World!", arial, 24) | outline(sf::Color::White) | fill(sf::Color::Red) | outline_thickness(1.F)
+                text("Hello World!", arial, 24) | outline(sf::Color::Red) | fill(sf::Color::White) | outline_thickness(1.F)
                 | position({ 1200, 400 }));
 
             drawables.push_back(
-                text("fps = " + std::to_string(fps), verdana, 12) | fill(sf::Color::White) | position({ 1200, 100 }));
+                text("fps = " + std::to_string(fps), verdana, 12) | bold() | italic() | fill(sf::Color::White) | position({ 1200, 100 }));
 
             for (const auto& d : drawables)
             {

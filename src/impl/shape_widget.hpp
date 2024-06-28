@@ -88,4 +88,16 @@ struct shape_widget : widget_impl
     void set_font_size(const applier_t<unsigned int>& applier) override
     {
     }
+
+    void set_line_spacing(const applier_t<float>& applier) override
+    {
+    }
+
+    void set_letter_spacing(const applier_t<float>& applier) override
+    {
+    }
+
+    void set_font_style(const applier_t<std::uint32_t>& applier) override
+    {
+    }
 };
