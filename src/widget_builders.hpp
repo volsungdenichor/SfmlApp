@@ -1,8 +1,8 @@
 #pragma once
 
-#include "shape_widget.hpp"
-#include "sprite_widget.hpp"
-#include "text_widget.hpp"
+#include "impl/shape_widget.hpp"
+#include "impl/sprite_widget.hpp"
+#include "impl/text_widget.hpp"
 #include "widget_t.hpp"
 
 using drawable_t = applier_t<sf::RenderTarget>;

@@ -1,9 +1,10 @@
 #pragma once
 
-#include <memory>
 #include <SFML/Graphics.hpp>
-#include "defs.hpp"
-#include "vec_t.hpp"
+#include <memory>
+
+#include "../defs.hpp"
+#include "../vec_t.hpp"
 
 struct widget_impl
 {
