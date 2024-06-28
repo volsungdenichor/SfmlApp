@@ -54,10 +54,11 @@ struct sprite_widget : widget_impl
     {
     }
 
-    void set_texture(const texture_region_t& region) override
+    void set_texture(const std::optional<texture_region_t>& region) override
     {
-        m_inner.setTexture(region.texture.get());
-        m_inner.setTextureRect(region.rect);
+        assert(region);
+        m_inner.setTexture(region->texture.get());
+        m_inner.setTextureRect(region->rect);
     }
 
     void set_text(const applier_t<sf::String>& text, const sf::Font& font, const applier_t<unsigned int>& size) override

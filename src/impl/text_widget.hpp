@@ -64,7 +64,7 @@ struct text_widget : widget_impl
         m_inner.setOutlineThickness(v);
     }
 
-    void set_texture(const texture_region_t& region) override
+    void set_texture(const std::optional<texture_region_t>& region) override
     {
     }
 

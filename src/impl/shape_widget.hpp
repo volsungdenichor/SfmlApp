@@ -63,10 +63,18 @@ struct shape_widget : widget_impl
         m_inner.setOutlineThickness(v);
     }
 
-     void set_texture(const texture_region_t& region) override
+    void set_texture(const std::optional<texture_region_t>& region) override
     {
-        m_inner.setTexture(&region.texture.get());
-        m_inner.setTextureRect(region.rect);
+        if (region)
+        {
+            m_inner.setTexture(&region->texture.get());
+            m_inner.setTextureRect(region->rect);
+        }
+        else
+        {
+            m_inner.setTexture(nullptr);
+            m_inner.setTextureRect(sf::IntRect{});
+        }
     }
 
     void set_text(const applier_t<sf::String>& text, const sf::Font& font, const applier_t<unsigned int>& size) override

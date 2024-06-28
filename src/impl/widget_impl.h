@@ -25,7 +25,7 @@ struct widget_impl
     virtual void set_fill_color(const applier_t<sf::Color>& applier) = 0;
     virtual void set_outline_color(const applier_t<sf::Color>& applier) = 0;
     virtual void set_outline_thickness(const applier_t<float>& applier) = 0;
-    virtual void set_texture(const texture_region_t& region) = 0;
+    virtual void set_texture(const std::optional<texture_region_t>& region) = 0;
 
     virtual void set_text(const applier_t<sf::String>& text, const sf::Font& font, const applier_t<unsigned int>& size) = 0;
 };
