@@ -8,9 +8,16 @@
 using time_point_t = float;
 using duration_t = float;
 
+using ease_function = std::function<float(float)>;
+
 inline time_point_t wrap(time_point_t time, duration_t duration, time_point_t inflection_point = {})
 {
     return time > duration ? inflection_point + std::fmod(time, duration - inflection_point) : time;
+}
+
+inline float lerp(float ratio, float a, float b)
+{
+    return ((1.F - ratio) * a) + (ratio * b);
 }
 
 template <class T>
@@ -148,6 +155,54 @@ struct repeat_fn
 
         T end_value() const override
         {
+            return m_inner->wrapped_value(this->duration());
+        }
+
+    private:
+        animation_ptr<T> m_inner;
+        float m_count;
+        time_point_t m_inflection_point;
+    };
+
+    template <class T>
+    auto operator()(animation<T> inner, float count, time_point_t inflection_point = {}) const -> animation<T>
+    {
+        return animation<T>(std::make_shared<impl<T>>(inner.m_impl, count, inflection_point));
+    }
+};
+
+struct ping_pong_fn
+{
+    template <class T>
+    class impl : public animation_impl<T>
+    {
+    public:
+        explicit impl(animation_ptr<T> inner, float count, time_point_t inflection_point)
+            : m_inner(std::move(inner))
+            , m_count(count)
+            , m_inflection_point(inflection_point)
+        {
+        }
+
+        duration_t duration() const override
+        {
+            return m_inner->duration() * m_count;
+        }
+
+        T value(time_point_t t) const override
+        {
+            const time_point_t t_ = std::fmod(t, m_inner->duration());
+            return (static_cast<int>(t / m_inner->duration()) % 2 == 0) ? m_inner->value(t_)
+                                                                        : m_inner->value(m_inner->duration() - t_);
+        }
+
+        T start_value() const override
+        {
+            return m_inner->start_value();
+        }
+
+        T end_value() const override
+        {
             return value(duration());
         }
 
@@ -161,6 +216,101 @@ struct repeat_fn
     auto operator()(animation<T> inner, float count, time_point_t inflection_point = {}) const -> animation<T>
     {
         return animation<T>(std::make_shared<impl<T>>(inner.m_impl, count, inflection_point));
+    }
+};
+
+struct slice_fn
+{
+    template <class T>
+    class impl : public animation_impl<T>
+    {
+    public:
+        explicit impl(animation_ptr<T> inner, time_point_t start, time_point_t end)
+            : m_inner(std::move(inner))
+            , m_start(start)
+            , m_end(end)
+        {
+        }
+
+        duration_t duration() const override
+        {
+            return m_end - m_start;
+        }
+
+        T value(time_point_t t) const override
+        {
+            return m_inner->value(clamp(t));
+        }
+
+        T start_value() const override
+        {
+            return value(0.F);
+        }
+
+        T end_value() const override
+        {
+            return value(duration());
+        }
+
+    private:
+        time_point_t clamp(time_point_t t) const
+        {
+            return std::min(std::min(m_start + t, m_inner->duration()), m_end);
+        }
+
+        animation_ptr<T> m_inner;
+        time_point_t m_start;
+        time_point_t m_end;
+    };
+
+    template <class T>
+    auto operator()(animation<T> inner, time_point_t start, time_point_t end) const -> animation<T>
+    {
+        return animation<T>(std::make_shared<impl<T>>(inner.m_impl, start, end));
+    }
+};
+
+struct rescale_fn
+{
+    template <class T>
+    class impl : public animation_impl<T>
+    {
+    public:
+        explicit impl(animation_ptr<T> inner, duration_t duration)
+            : m_inner(std::move(inner))
+            , m_duration(duration)
+        {
+        }
+
+        duration_t duration() const override
+        {
+            return m_duration;
+        }
+
+        T value(time_point_t t) const override
+        {
+            return m_inner->value(t * m_inner->duration() / m_duration);
+        }
+
+        T start_value() const override
+        {
+            return value(0.F);
+        }
+
+        T end_value() const override
+        {
+            return value(duration());
+        }
+
+    private:
+        animation_ptr<T> m_inner;
+        duration_t m_duration;
+    };
+
+    template <class T>
+    auto operator()(animation<T> inner, duration_t duration) const -> animation<T>
+    {
+        return animation<T>(std::make_shared<impl<T>>(inner.m_impl, duration));
     }
 };
 
@@ -204,14 +354,6 @@ struct constant_fn
         return animation<T>(std::make_shared<impl<T>>(value, duration));
     }
 };
-
-using ease_function = std::function<float(float)>;
-
-template <class R, class T>
-auto lerp(R ratio, T a, T b) -> std::invoke_result_t<std::multiplies<>, R, T>
-{
-    return ((R(1) - ratio) * a) + (ratio * b);
-}
 
 struct gradual_fn
 {
@@ -328,10 +470,22 @@ struct sequence_fn
         std::vector<animation_ptr<T>> ptrs{ head.m_impl, tail.m_impl... };
         return animation<T>(std::make_shared<impl<T>>(std::move(ptrs)));
     }
+
+    template <class T>
+    auto operator()(std::vector<animation<T>> vect) const -> animation<T>
+    {
+        std::vector<animation_ptr<T>> ptrs;
+        ptrs.reserve(vect.size());
+        std::transform(std::begin(vect), std::end(vect), std::back_inserter(ptrs), [](const animation<T>& a) { return a.m_impl; });
+        return animation<T>(std::make_shared<impl<T>>(std::move(ptrs)));
+    }
 };
 
 static constexpr inline auto reverse = reverse_fn{};
 static constexpr inline auto repeat = repeat_fn{};
+static constexpr inline auto ping_pong = ping_pong_fn{};
 static constexpr inline auto constant = constant_fn{};
 static constexpr inline auto gradual = gradual_fn{};
+static constexpr inline auto slice = slice_fn{};
+static constexpr inline auto rescale = rescale_fn{};
 static constexpr inline auto sequence = sequence_fn{};

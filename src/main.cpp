@@ -47,12 +47,10 @@ sf::Font load_font(const std::string& path)
 
 void run()
 {
-    const auto anim = repeat(
-        sequence(
-            gradual(0.F, 200.F, duration_t{ 10.F }, ease::cubic_out),
-            constant(200.F, duration_t{ 10.F }),
-            gradual(200.F, 0.F, duration_t{ 5.F }, ease::cubic_in)),
-        3.F);
+    std::vector<animation<float>> animations;
+    animations.push_back(gradual(0.F, 600.F, duration_t{ 10.F }, ease::none));
+    animations.push_back(rescale(animations[0], duration_t{ 50.F }));
+    animations.push_back(ping_pong(animations[0], 5.F));
 
     float angle = 0.F;
     float anim_time = 0.F;
@@ -158,7 +156,11 @@ void run()
                 text("fps = " + std::to_string(fps), verdana, 12) | bold() | italic() | fill(sf::Color::White)
                 | position({ 1200, 100 }));
 
-            drawables.push_back(circle(10) | fill(sf::Color::White) | position({ anim(anim_time), 500 }));
+            for (std::size_t i = 0; i < animations.size(); ++i)
+            {
+                drawables.push_back(
+                    circle(10) | fill(sf::Color::White) | position({ animations[i](anim_time), 500.F + 50.F * i }));
+            }
 
             for (const auto& d : drawables)
             {
