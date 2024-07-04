@@ -1,6 +1,7 @@
 #include <SFML/Graphics.hpp>
 #include <SFML/Window.hpp>
 #include <cmath>
+#include <cstdint>
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -54,6 +55,7 @@ struct text_style_t
     unsigned int font_size = 16;
     float letter_spacing = 1.F;
     float line_spacing = 1.F;
+    std::uint32_t style = sf::Text::Regular;
 };
 
 struct state_t
@@ -68,50 +70,41 @@ struct context_t
     sf::RenderTarget* target;
 };
 
-using canvas_item = std::function<state_t(const state_t&, context_t&)>;
+using canvas_item = std::function<void(const state_t&, context_t&)>;
+
+auto modify_state(const canvas_item& item, const action_t<state_t&>& op) -> canvas_item
+{
+    return [=](const state_t& state, context_t& ctx)
+    {
+        state_t new_state = state;
+        op(new_state);
+        item(new_state, ctx);
+    };
+};
+
+auto blend(sf::BlendMode mode, const canvas_item& item) -> canvas_item
+{
+    return modify_state(item, [=](state_t& state) { state.render_states.blendMode = mode; });
+}
 
 auto fill_color(const sf::Color& color, const canvas_item& item) -> canvas_item
 {
-    return [=](const state_t& state, context_t& ctx) -> state_t
-    {
-        state_t new_state = state;
-        new_state.style.fill_color = color;
-        item(new_state, ctx);
-        return state;
-    };
+    return modify_state(item, [=](state_t& state) { state.style.fill_color = color; });
 }
 
 auto outline_color(const sf::Color& color, const canvas_item& item) -> canvas_item
 {
-    return [=](const state_t& state, context_t& ctx) -> state_t
-    {
-        state_t new_state = state;
-        new_state.style.outline_color = color;
-        item(new_state, ctx);
-        return state;
-    };
+    return modify_state(item, [=](state_t& state) { state.style.outline_color = color; });
 }
 
 auto outline_thickness(float value, const canvas_item& item) -> canvas_item
 {
-    return [=](const state_t& state, context_t& ctx) -> state_t
-    {
-        state_t new_state = state;
-        new_state.style.outline_thickness = value;
-        item(new_state, ctx);
-        return state;
-    };
+    return modify_state(item, [=](state_t& state) { state.style.outline_thickness = value; });
 }
 
 auto font(const sf::Font& value, const canvas_item& item) -> canvas_item
 {
-    return [=](const state_t& state, context_t& ctx) -> state_t
-    {
-        state_t new_state = state;
-        new_state.text_style.font = &value;
-        item(new_state, ctx);
-        return state;
-    };
+    return modify_state(item, [&](state_t& state) { state.text_style.font = &value; });
 }
 
 void apply_style(sf::Shape& shape, const style_t& style)
@@ -121,9 +114,37 @@ void apply_style(sf::Shape& shape, const style_t& style)
     shape.setOutlineThickness(style.outline_thickness);
 }
 
-auto text(const sf::String& str)
+auto translate(const vec_t& v, const canvas_item& item) -> canvas_item
 {
-    return [=](const state_t& state, context_t& ctx) -> state_t
+    return modify_state(item, [=](state_t& state) { state.render_states.transform.translate(v); });
+}
+
+auto scale(const vec_t& v, const canvas_item& item)
+{
+    return modify_state(item, [=](state_t& state) { state.render_states.transform.scale(v); });
+}
+
+auto rotate(float a, const canvas_item& item) -> canvas_item
+{
+    return modify_state(item, [=](state_t& state) { state.render_states.transform.rotate(a); });
+}
+
+template <class... Args>
+auto layer(Args&&... args) -> canvas_item
+{
+    std::vector<canvas_item> items{ canvas_item(args)... };
+    return [=](const state_t& state, context_t& ctx)
+    {
+        for (const auto& item : items)
+        {
+            item(state, ctx);
+        }
+    };
+}
+
+auto text(const sf::String& str) -> canvas_item
+{
+    return [=](const state_t& state, context_t& ctx)
     {
         sf::Text shape{};
         shape.setString(str);
@@ -137,84 +158,45 @@ auto text(const sf::String& str)
         shape.setCharacterSize(state.text_style.font_size);
         shape.setLetterSpacing(state.text_style.letter_spacing);
         shape.setLineSpacing(state.text_style.line_spacing);
+        shape.setStyle(state.text_style.style);
         ctx.target->draw(shape, state.render_states);
-        return state;
     };
 }
 
 auto rect(const vec_t& size) -> canvas_item
 {
-    return [=](const state_t& state, context_t& ctx) -> state_t
+    return [=](const state_t& state, context_t& ctx)
     {
         sf::RectangleShape shape(size);
         apply_style(shape, state.style);
         ctx.target->draw(shape, state.render_states);
-        return state;
     };
 }
 
 auto circle(float r) -> canvas_item
 {
-    return [=](const state_t& state, context_t& ctx) -> state_t
+    return [=](const state_t& state, context_t& ctx)
     {
         sf::CircleShape shape(r);
         apply_style(shape, state.style);
         ctx.target->draw(shape, state.render_states);
-        return state;
     };
 }
 
-auto translate(const vec_t& v, const canvas_item& item) -> canvas_item
+auto sprite(const sf::Texture& texture, const sf::IntRect& rect) -> canvas_item
 {
-    return [=](const state_t& state, context_t& ctx) -> state_t
+    return [&texture, rect](const state_t& state, context_t& ctx)
     {
-        state_t new_state = state;
-        new_state.render_states.transform.translate(v);
-        item(new_state, ctx);
-        return state;
-    };
-}
-
-auto scale(const vec_t& v, const canvas_item& item) -> canvas_item
-{
-    return [=](const state_t& state, context_t& ctx) -> state_t
-    {
-        state_t new_state = state;
-        new_state.render_states.transform.scale(v);
-        item(new_state, ctx);
-        return state;
-    };
-}
-
-auto rotate(float a, const canvas_item& item) -> canvas_item
-{
-    return [=](const state_t& state, context_t& ctx) -> state_t
-    {
-        state_t new_state = state;
-        new_state.render_states.transform.rotate(a);
-        item(new_state, ctx);
-        return state;
-    };
-}
-
-template <class... Args>
-auto layer(Args&&... args) -> canvas_item
-{
-    std::vector<canvas_item> items{ canvas_item(args)... };
-    return [=](const state_t& state, context_t& ctx) -> state_t
-    {
-        state_t new_state = state;
-        for (const auto& item : items)
-        {
-            new_state = item(new_state, ctx);
-        }
-        return state;
+        sf::Sprite shape{};
+        shape.setTexture(texture);
+        shape.setTextureRect(rect);
+        ctx.target->draw(shape, state.render_states);
     };
 }
 
 auto grid(const vec_t& size, const vec_t& dist) -> canvas_item
 {
-    return [=](const state_t& state, context_t& ctx) -> state_t
+    return [=](const state_t& state, context_t& ctx)
     {
         for (int i = 0; i < size[0]; i += dist[0])
         {
@@ -234,8 +216,26 @@ auto grid(const vec_t& size, const vec_t& dist) -> canvas_item
             line[1].color = state.style.outline_color;
             ctx.target->draw(line, 2, sf::PrimitiveType::Lines, state.render_states);
         }
-        return state;
     };
+}
+
+auto triangle(const std::array<vec_t, 3>& vertices)
+{
+    return [=](const state_t& state, context_t& ctx)
+    {
+        sf::VertexArray shape(sf::PrimitiveType::Triangles, 3);
+        for (std::size_t i = 0; i < 3; ++i)
+        {
+            shape[i].position = vertices[i];
+            shape[i].color = state.style.fill_color;
+        }
+        ctx.target->draw(shape, state.render_states);
+    };
+}
+
+auto triangle(const vec_t& a, const vec_t& b, const vec_t& c)
+{
+    return triangle({ a, b, c });
 }
 
 }  // namespace foo
@@ -254,6 +254,7 @@ void run()
         }
     };
 
+    const sf::Texture txt = load_texture(R"(/mnt/d/Users/Krzysiek/Pictures/conan.bmp)");
     const sf::Font arial = load_font(R"(/mnt/c/Windows/Fonts/arial.ttf)");
     const sf::Font verdana = load_font(R"(/mnt/c/Windows/Fonts/verdana.ttf)");
 
@@ -269,6 +270,17 @@ void run()
                 foo::outline_color(
                     sf::Color(64, 0, 0), foo::grid({ float(w.getSize().x), float(w.getSize().y) }, { 100.F, 100.F })),
                 foo::translate(
+                    { 300, 300 },
+                    foo::rotate(
+                        45.F - angle,
+                        foo::blend(
+                            sf::BlendMode{ sf::BlendMode::Factor::One,
+                                           sf::BlendMode::Factor::SrcAlpha,
+                                           sf::BlendMode::Equation::Subtract },
+                            foo::sprite(txt, { 0, 0, 200, 200 })))),
+                foo::translate(
+                    { 100, 500 }, foo::fill_color(sf::Color::Red, foo::triangle({ 10, 0 }, { 20, 20 }, { 0, 20 }))),
+                foo::translate(
                     { 1000, 600 },
                     foo::outline_thickness(0.F, foo::fill_color(sf::Color::White, foo::text(std::to_string(fps))))),
                 foo::translate(
@@ -283,8 +295,11 @@ void run()
                                     { 200, 200 },
                                     foo::layer(
                                         foo::translate({ 200, 0 }, foo::circle(50.F)),
-                                        foo::outline_color(
-                                            sf::Color::Red, foo::fill_color(sf::Color::Green, foo::rect({ 20.F, 20.F }))),
+                                        foo::outline_thickness(
+                                            2.F,
+                                            foo::outline_color(
+                                                sf::Color::Green,
+                                                foo::fill_color(sf::Color::Blue, foo::rect({ 20.F, 20.F })))),
                                         foo::fill_color(
                                             sf::Color::Red,
                                             foo::translate({ 100, 50 }, foo::rotate(45.F, foo::rect({ 10.F, 5.F })))))))))));
