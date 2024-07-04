@@ -71,6 +71,33 @@ struct context_t
 };
 
 using canvas_item = std::function<void(const state_t&, context_t&)>;
+using state_modifier = action_t<state_t&>;
+
+auto operator|(const state_modifier& lhs, const state_modifier& rhs) -> state_modifier
+{
+    return [=](state_t& state)
+    {
+        lhs(state);
+        rhs(state);
+    };
+}
+
+auto operator|(const canvas_item& item, const state_modifier& modifier) -> canvas_item
+{
+    return [=](const state_t& state, context_t& ctx)
+    {
+        state_t new_state = state;
+        modifier(new_state);
+        item(new_state, ctx);
+    };
+}
+
+void apply_style(sf::Shape& shape, const style_t& style)
+{
+    shape.setFillColor(style.fill_color);
+    shape.setOutlineColor(style.outline_color);
+    shape.setOutlineThickness(style.outline_thickness);
+}
 
 auto modify_state(const canvas_item& item, const action_t<state_t&>& op) -> canvas_item
 {
@@ -82,51 +109,84 @@ auto modify_state(const canvas_item& item, const action_t<state_t&>& op) -> canv
     };
 };
 
+auto blend(sf::BlendMode mode) -> state_modifier
+{
+    return [=](state_t& state) { state.render_states.blendMode = mode; };
+}
+
 auto blend(sf::BlendMode mode, const canvas_item& item) -> canvas_item
 {
-    return modify_state(item, [=](state_t& state) { state.render_states.blendMode = mode; });
+    return modify_state(item, blend(mode));
+}
+
+auto fill_color(const sf::Color& color) -> state_modifier
+{
+    return [=](state_t& state) { state.style.fill_color = color; };
 }
 
 auto fill_color(const sf::Color& color, const canvas_item& item) -> canvas_item
 {
-    return modify_state(item, [=](state_t& state) { state.style.fill_color = color; });
+    return modify_state(item, fill_color(color));
+}
+
+auto outline_color(const sf::Color& color) -> state_modifier
+{
+    return [=](state_t& state) { state.style.outline_color = color; };
 }
 
 auto outline_color(const sf::Color& color, const canvas_item& item) -> canvas_item
 {
-    return modify_state(item, [=](state_t& state) { state.style.outline_color = color; });
+    return modify_state(item, outline_color(color));
+}
+
+auto outline_thickness(float value) -> state_modifier
+{
+    return [=](state_t& state) { state.style.outline_thickness = value; };
 }
 
 auto outline_thickness(float value, const canvas_item& item) -> canvas_item
 {
-    return modify_state(item, [=](state_t& state) { state.style.outline_thickness = value; });
+    return modify_state(item, outline_thickness(value));
+}
+
+auto font(const sf::Font& value) -> state_modifier
+{
+    return [&](state_t& state) { state.text_style.font = &value; };
 }
 
 auto font(const sf::Font& value, const canvas_item& item) -> canvas_item
 {
-    return modify_state(item, [&](state_t& state) { state.text_style.font = &value; });
+    return modify_state(item, font(value));
 }
 
-void apply_style(sf::Shape& shape, const style_t& style)
+auto translate(const vec_t& v) -> state_modifier
 {
-    shape.setFillColor(style.fill_color);
-    shape.setOutlineColor(style.outline_color);
-    shape.setOutlineThickness(style.outline_thickness);
+    return [=](state_t& state) { state.render_states.transform.translate(v); };
 }
 
 auto translate(const vec_t& v, const canvas_item& item) -> canvas_item
 {
-    return modify_state(item, [=](state_t& state) { state.render_states.transform.translate(v); });
+    return modify_state(item, translate(v));
+}
+
+auto scale(const vec_t& v) -> state_modifier
+{
+    return [=](state_t& state) { state.render_states.transform.scale(v); };
 }
 
 auto scale(const vec_t& v, const canvas_item& item)
 {
-    return modify_state(item, [=](state_t& state) { state.render_states.transform.scale(v); });
+    return modify_state(item, scale(v));
+}
+
+auto rotate(float a) -> state_modifier
+{
+    return [=](state_t& state) { state.render_states.transform.rotate(a); };
 }
 
 auto rotate(float a, const canvas_item& item) -> canvas_item
 {
-    return modify_state(item, [=](state_t& state) { state.render_states.transform.rotate(a); });
+    return modify_state(item, rotate(a));
 }
 
 template <class... Args>
@@ -283,28 +343,14 @@ void run()
         [&](float dt) { angle += dt * 10.F; },
         [&](sf::RenderWindow& w, float fps)
         {
+            const auto size = vec_t{ float(w.getSize().x), float(w.getSize().y) };
             const auto obj = foo::layer(
-                foo::outline_color(
-                    sf::Color(64, 0, 0), foo::grid({ float(w.getSize().x), float(w.getSize().y) }, { 100.F, 100.F })),
-                foo::translate(
-                    { 300, 300 },
-                    foo::rotate(
-                        45.F - angle,
-                        foo::blend(
-                            sf::BlendMode{ sf::BlendMode::Factor::One,
-                                           sf::BlendMode::Factor::SrcAlpha,
-                                           sf::BlendMode::Equation::Subtract },
-                            foo::sprite(txt, { 0, 0, 200, 200 })))),
+                foo::grid(size, { 100.F, 100.F }) | foo::outline_color(sf::Color(64, 0, 0)),
+                foo::sprite(txt, { 0, 0, 200, 200 }) | foo::rotate(45.F - angle) | foo::translate({ 300, 300 }),
                 foo::translate(
                     { 100, 500 }, foo::fill_color(sf::Color::Red, foo::triangle({ 10, 0 }, { 20, 20 }, { 0, 20 }))),
-                foo::translate(
-                    { 1000, 600 },
-                    foo::outline_thickness(0.F, foo::fill_color(sf::Color::White, foo::text(std::to_string(fps))))),
-                foo::map(
-                    [](int x) -> foo::canvas_item {
-                        return foo::translate({ 100.F * x, 50.F * x }, foo::fill_color(sf::Color::Blue, foo::circle(10.F)));
-                    },
-                    std::vector<int>{ 0, 1, 2, 4, 7, 8 }),
+                foo::text(std::to_string(fps)) | foo::translate({ 1000, 600 }) | foo::outline_thickness(0.F)
+                    | foo::fill_color(sf::Color::White),
                 foo::translate(
                     { 200, 0 },
                     foo::scale(
