@@ -298,28 +298,27 @@ auto triangle(const vec_t& a, const vec_t& b, const vec_t& c) -> canvas_item
     return triangle({ a, b, c });
 }
 
-template <class Func, class In>
-auto map(Func&& func, const In& source) -> canvas_item
-{
-    std::vector<canvas_item> items;
-    for (const auto& item : source)
-    {
-        items.push_back(std::invoke(func, item));
-    }
-    return [=](const state_t& state, context_t& ctx)
-    {
-        for (const auto& item : items)
-        {
-            item(state, ctx);
-        }
-    };
-};
-
 }  // namespace foo
+
+action_t<sf::RenderWindow&, float> render_scene(
+    const std::function<foo::canvas_item(const vec_t&, float)>& scene_builder, const sf::Font* default_font)
+{
+    return [=](sf::RenderWindow& w, float fps)
+    {
+        const auto size = vec_t{ float(w.getSize().x), float(w.getSize().y) };
+        foo::context_t ctx{ &w };
+        foo::state_t state{};
+        state.text_style.font = default_font;
+        const foo::canvas_item scene = scene_builder(size, fps);
+        scene(state, ctx);
+    };
+}
 
 void run()
 {
     auto window = sf::RenderWindow{ { 1920u, 1080u }, "CMake SFML Project" };
+
+    float rotation_speed = 10.F;
 
     event_handler_t event_handler{};
     event_handler.on_close = [](sf::RenderWindow& w) { w.close(); };
@@ -328,6 +327,10 @@ void run()
         if (e.code == sf::Keyboard::Escape)
         {
             w.close();
+        }
+        if (e.code == sf::Keyboard::Space)
+        {
+            rotation_speed = -rotation_speed;
         }
     };
 
@@ -340,43 +343,42 @@ void run()
     run_app(
         window,
         event_handler,
-        [&](float dt) { angle += dt * 10.F; },
-        [&](sf::RenderWindow& w, float fps)
-        {
-            const auto size = vec_t{ float(w.getSize().x), float(w.getSize().y) };
-            const auto obj = foo::layer(
-                foo::grid(size, { 100.F, 100.F }) | foo::outline_color(sf::Color(64, 0, 0)),
-                foo::sprite(txt, { 0, 0, 200, 200 }) | foo::rotate(45.F - angle) | foo::translate({ 300, 300 }),
-                foo::translate(
-                    { 100, 500 }, foo::fill_color(sf::Color::Red, foo::triangle({ 10, 0 }, { 20, 20 }, { 0, 20 }))),
-                foo::text(std::to_string(fps)) | foo::translate({ 1000, 600 }) | foo::outline_thickness(0.F)
-                    | foo::fill_color(sf::Color::White),
-                foo::translate(
-                    { 200, 0 },
-                    foo::scale(
-                        { 1.F, 2.0F },
+        [&](float dt) { angle += dt * rotation_speed; },
+        render_scene(
+            [&](const vec_t& size, float fps) -> foo::canvas_item
+            {
+                return foo::layer(
+                    foo::grid(size, { 100.F, 100.F })  //
+                        | foo::outline_color(sf::Color(64, 0, 0)),
+                    foo::sprite(txt, { 0, 0, 200, 200 })  //
+                        | foo::rotate(45.F - angle)       //
+                        | foo::translate({ 300, 300 }),
+                    foo::triangle({ 10, 0 }, { 20, 20 }, { 0, 20 })  //
+                        | foo::translate({ 100, 500 })               //
+                        | foo::fill_color(sf::Color::Red),
+                    foo::text(std::to_string(fps))       //
+                        | foo::translate({ 1000, 600 })  //
+                        | foo::outline_thickness(0.F)    //
+                        | foo::fill_color(sf::Color::White),
+                    foo::layer(
+                        foo::circle(50),
                         foo::layer(
-                            foo::circle(50),
-                            foo::rotate(
-                                angle,
-                                foo::translate(
-                                    { 200, 200 },
-                                    foo::layer(
-                                        foo::translate({ 200, 0 }, foo::circle(50.F)),
-                                        foo::outline_thickness(
-                                            2.F,
-                                            foo::outline_color(
-                                                sf::Color::Green,
-                                                foo::fill_color(sf::Color::Blue, foo::rect({ 20.F, 20.F })))),
-                                        foo::fill_color(
-                                            sf::Color::Red,
-                                            foo::translate({ 100, 50 }, foo::rotate(45.F, foo::rect({ 10.F, 5.F })))))))))));
-
-            foo::context_t ctx{ &w };
-            foo::state_t state{};
-            state.text_style.font = &verdana;
-            obj(state, ctx);
-        },
+                            foo::circle(50.F)  //
+                                | foo::translate({ 200, 0 }),
+                            foo::rect({ 20.F, 20.F })                   //
+                                | foo::outline_thickness(2.F)           //
+                                | foo::outline_color(sf::Color::Green)  //
+                                | foo::fill_color(sf::Color::Blue),
+                            foo::rect({ 10.F, 5.F })               //
+                                | foo::fill_color(sf::Color::Red)  //
+                                | foo::translate({ 100, 50 })      //
+                                | foo::rotate(45.F))               //
+                            | foo::translate({ 200, 200 })         //
+                            | foo::rotate(angle))
+                        | foo::translate({ 200, 0 })  //
+                        | foo::scale({ 1.F, 2.F }));
+            },
+            &verdana),
         0.01F);
 }
 
