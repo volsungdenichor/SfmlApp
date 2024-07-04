@@ -1,15 +1,25 @@
 #include <SFML/Graphics.hpp>
 #include <SFML/Window.hpp>
 #include <cmath>
+#include <iomanip>
 #include <cstdint>
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <sstream>
 
 #include "animation.hpp"
 #include "app_runner.hpp"
 #include "event_handler_t.hpp"
 #include "vec_t.hpp"
+
+template <class... Args>
+std::string str(Args&&... args)
+{
+    std::stringstream ss;
+    (ss << ... << args);
+    return ss.str();
+}
 
 template <class T>
 T create(const action_t<T&>& init)
@@ -109,14 +119,29 @@ auto modify_state(const canvas_item& item, const action_t<state_t&>& op) -> canv
     };
 };
 
+auto text_style(std::uint32_t value) -> state_modifier
+{
+    return [=](state_t& state) { state.text_style.style = value; };
+}
+
+auto bold() -> state_modifier
+{
+    return [=](state_t& state) { state.text_style.style |= sf::Text::Bold; };
+}
+
+auto italic() -> state_modifier
+{
+    return [=](state_t& state) { state.text_style.style |= sf::Text::Italic; };
+}
+
+auto underlined() -> state_modifier
+{
+    return [=](state_t& state) { state.text_style.style |= sf::Text::Underlined; };
+}
+
 auto blend(sf::BlendMode mode) -> state_modifier
 {
     return [=](state_t& state) { state.render_states.blendMode = mode; };
-}
-
-auto blend(sf::BlendMode mode, const canvas_item& item) -> canvas_item
-{
-    return modify_state(item, blend(mode));
 }
 
 auto fill_color(const sf::Color& color) -> state_modifier
@@ -124,19 +149,9 @@ auto fill_color(const sf::Color& color) -> state_modifier
     return [=](state_t& state) { state.style.fill_color = color; };
 }
 
-auto fill_color(const sf::Color& color, const canvas_item& item) -> canvas_item
-{
-    return modify_state(item, fill_color(color));
-}
-
 auto outline_color(const sf::Color& color) -> state_modifier
 {
     return [=](state_t& state) { state.style.outline_color = color; };
-}
-
-auto outline_color(const sf::Color& color, const canvas_item& item) -> canvas_item
-{
-    return modify_state(item, outline_color(color));
 }
 
 auto outline_thickness(float value) -> state_modifier
@@ -144,19 +159,9 @@ auto outline_thickness(float value) -> state_modifier
     return [=](state_t& state) { state.style.outline_thickness = value; };
 }
 
-auto outline_thickness(float value, const canvas_item& item) -> canvas_item
-{
-    return modify_state(item, outline_thickness(value));
-}
-
 auto font(const sf::Font& value) -> state_modifier
 {
     return [&](state_t& state) { state.text_style.font = &value; };
-}
-
-auto font(const sf::Font& value, const canvas_item& item) -> canvas_item
-{
-    return modify_state(item, font(value));
 }
 
 auto translate(const vec_t& v) -> state_modifier
@@ -164,19 +169,14 @@ auto translate(const vec_t& v) -> state_modifier
     return [=](state_t& state) { state.render_states.transform.translate(v); };
 }
 
-auto translate(const vec_t& v, const canvas_item& item) -> canvas_item
-{
-    return modify_state(item, translate(v));
-}
-
 auto scale(const vec_t& v) -> state_modifier
 {
     return [=](state_t& state) { state.render_states.transform.scale(v); };
 }
 
-auto scale(const vec_t& v, const canvas_item& item)
+auto scale(const vec_t& v, const vec_t& pivot) -> state_modifier
 {
-    return modify_state(item, scale(v));
+    return translate(pivot) | scale(v) | translate(-pivot);
 }
 
 auto rotate(float a) -> state_modifier
@@ -184,13 +184,13 @@ auto rotate(float a) -> state_modifier
     return [=](state_t& state) { state.render_states.transform.rotate(a); };
 }
 
-auto rotate(float a, const canvas_item& item) -> canvas_item
+auto rotate(float a, const vec_t& pivot) -> state_modifier
 {
-    return modify_state(item, rotate(a));
+    return translate(pivot) | rotate(a) | translate(-pivot);
 }
 
 template <class... Args>
-auto layer(Args&&... args) -> canvas_item
+auto group(Args&&... args) -> canvas_item
 {
     std::vector<canvas_item> items{ canvas_item(args)... };
     return [=](const state_t& state, context_t& ctx)
@@ -298,6 +298,21 @@ auto triangle(const vec_t& a, const vec_t& b, const vec_t& c) -> canvas_item
     return triangle({ a, b, c });
 }
 
+auto polygon(const std::vector<vec_t>& vertices) -> canvas_item
+{
+    return [=](const state_t& state, context_t& ctx)
+    {
+        sf::ConvexShape shape{};
+        shape.setPointCount(vertices.size());
+        for (std::size_t i = 0; i < vertices.size(); ++i)
+        {
+            shape.setPoint(i, vertices[i]);
+        }
+        apply_style(shape, state.style);
+        ctx.target->draw(shape, state.render_states);
+    };
+}
+
 }  // namespace foo
 
 action_t<sf::RenderWindow&, float> render_scene(
@@ -318,7 +333,9 @@ void run()
 {
     auto window = sf::RenderWindow{ { 1920u, 1080u }, "CMake SFML Project" };
 
-    float rotation_speed = 10.F;
+    int acceleration = 1;
+    float rotation_speed = 30.F;
+    float angle = 0.F;
 
     event_handler_t event_handler{};
     event_handler.on_close = [](sf::RenderWindow& w) { w.close(); };
@@ -332,37 +349,54 @@ void run()
         {
             rotation_speed = -rotation_speed;
         }
+        if (e.code == sf::Keyboard::Tab)
+        {
+            if (acceleration == 16)
+            {
+                acceleration = 1;
+            }
+            else
+            {
+                acceleration *= 2;
+            }
+        }
     };
 
     const sf::Texture txt = load_texture(R"(/mnt/d/Users/Krzysiek/Pictures/conan.bmp)");
     const sf::Font arial = load_font(R"(/mnt/c/Windows/Fonts/arial.ttf)");
     const sf::Font verdana = load_font(R"(/mnt/c/Windows/Fonts/verdana.ttf)");
 
-    float angle = 0.F;
-
     run_app(
         window,
         event_handler,
-        [&](float dt) { angle += dt * rotation_speed; },
+        [&](float dt) { angle += dt * rotation_speed * acceleration; },
         render_scene(
             [&](const vec_t& size, float fps) -> foo::canvas_item
             {
-                return foo::layer(
+                return foo::group(
                     foo::grid(size, { 100.F, 100.F })  //
                         | foo::outline_color(sf::Color(64, 0, 0)),
+                    foo::polygon({ { 0, 0 },   { 20, 0 },  { 30, 10 }, { 50, 10 }, { 60, 0 },  { 80, 0 },  { 80, 20 },
+                                   { 70, 30 }, { 70, 50 }, { 80, 60 }, { 80, 80 }, { 60, 80 }, { 50, 70 }, { 30, 70 },
+                                   { 20, 80 }, { 0, 80 },  { 0, 60 },  { 10, 50 }, { 10, 30 }, { 0, 20 } })
+                        | foo::rotate(angle * 3.F, { 40, 40 })    //
+                        | foo::translate({ 800, 400 })            //
+                        | foo::outline_color(sf::Color::Magenta)  //
+                        | foo::fill_color(sf::Color::Magenta),
                     foo::sprite(txt, { 0, 0, 200, 200 })  //
                         | foo::rotate(45.F - angle)       //
                         | foo::translate({ 300, 300 }),
                     foo::triangle({ 10, 0 }, { 20, 20 }, { 0, 20 })  //
                         | foo::translate({ 100, 500 })               //
                         | foo::fill_color(sf::Color::Red),
-                    foo::text(std::to_string(fps))       //
+                    foo::text(str("[x", acceleration, "] fps=", std::fixed, std::setprecision(1), fps))       //
+                        | foo::bold()                    //
                         | foo::translate({ 1000, 600 })  //
                         | foo::outline_thickness(0.F)    //
                         | foo::fill_color(sf::Color::White),
-                    foo::layer(
-                        foo::circle(50),
-                        foo::layer(
+                    foo::group(
+                        foo::circle(50) | foo::fill_color(sf::Color(255, 0, 0)),
+                        foo::group(
                             foo::circle(50.F)  //
                                 | foo::translate({ 200, 0 }),
                             foo::rect({ 20.F, 20.F })                   //
