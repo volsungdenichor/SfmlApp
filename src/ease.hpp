@@ -2,6 +2,9 @@
 
 #include <cmath>
 
+namespace anim
+{
+
 namespace ease
 {
 
@@ -118,3 +121,5 @@ static const inline auto cubic_out = detail::ease_fn_t<detail::type::cubic, deta
 static const inline auto cubic_in_out = detail::ease_fn_t<detail::type::cubic, detail::direction::in_out>{};
 
 }  // namespace ease
+
+}  // namespace anim

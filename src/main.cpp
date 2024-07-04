@@ -1,9 +1,9 @@
 #include <SFML/Graphics.hpp>
 #include <SFML/Window.hpp>
 #include <cmath>
-#include <iomanip>
 #include <cstdint>
 #include <functional>
+#include <iomanip>
 #include <iostream>
 #include <memory>
 #include <sstream>
@@ -27,6 +27,18 @@ T create(const action_t<T&>& init)
     T result{};
     init(result);
     return result;
+}
+
+template <class T, class... Tail>
+std::vector<T> vec(T head, Tail&&... tail)
+{
+    return std::vector<T>{ std::move(head), std::forward<Tail>(tail)... };
+}
+
+template <class T>
+std::vector<T> repeat(T value, std::size_t count)
+{
+    return std::vector<T>(count, std::move(value));
 }
 
 sf::Texture load_texture(const std::string& path)
@@ -313,6 +325,17 @@ auto polygon(const std::vector<vec_t>& vertices) -> canvas_item
     };
 }
 
+auto array(const std::vector<canvas_item>& items, const vec_t& dist) -> canvas_item
+{
+    return [=](const state_t& state, context_t& ctx)
+    {
+        for (std::size_t i = 0; i < items.size(); ++i)
+        {
+            (items[i] | translate(dist * i))(state, ctx);
+        }
+    };
+}
+
 }  // namespace foo
 
 action_t<sf::RenderWindow&, float> render_scene(
@@ -389,10 +412,21 @@ void run()
                     foo::triangle({ 10, 0 }, { 20, 20 }, { 0, 20 })  //
                         | foo::translate({ 100, 500 })               //
                         | foo::fill_color(sf::Color::Red),
-                    foo::text(str("[x", acceleration, "] fps=", std::fixed, std::setprecision(1), fps))       //
-                        | foo::bold()                    //
-                        | foo::translate({ 1000, 600 })  //
-                        | foo::outline_thickness(0.F)    //
+                    foo::array(
+                        repeat(
+                            foo::array(
+                                { foo::circle(10) | foo::fill_color(sf::Color::Cyan),
+                                  foo::circle(10) | foo::fill_color(sf::Color::Magenta),
+                                  foo::circle(10) | foo::fill_color(sf::Color::Yellow) },
+                                { 100, 0 })
+                                | foo::outline_color(sf::Color::Black),
+                            4),
+                        { 0, 50 })
+                        | foo::translate({ 500, 0 }),
+                    foo::text(str("[x", acceleration, "] fps=", std::fixed, std::setprecision(1), fps))  //
+                        | foo::bold()                                                                    //
+                        | foo::translate({ 1000, 600 })                                                  //
+                        | foo::outline_thickness(0.F)                                                    //
                         | foo::fill_color(sf::Color::White),
                     foo::group(
                         foo::circle(50) | foo::fill_color(sf::Color(255, 0, 0)),

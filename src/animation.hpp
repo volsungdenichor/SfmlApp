@@ -5,6 +5,9 @@
 
 #include "ease.hpp"
 
+namespace anim
+{
+
 using time_point_t = float;
 using duration_t = float;
 
@@ -276,9 +279,7 @@ struct rescale_fn
     class impl : public animation_impl<T>
     {
     public:
-        explicit impl(animation_ptr<T> inner, duration_t duration)
-            : m_inner(std::move(inner))
-            , m_duration(duration)
+        explicit impl(animation_ptr<T> inner, duration_t duration) : m_inner(std::move(inner)), m_duration(duration)
         {
         }
 
@@ -476,7 +477,8 @@ struct sequence_fn
     {
         std::vector<animation_ptr<T>> ptrs;
         ptrs.reserve(vect.size());
-        std::transform(std::begin(vect), std::end(vect), std::back_inserter(ptrs), [](const animation<T>& a) { return a.m_impl; });
+        std::transform(
+            std::begin(vect), std::end(vect), std::back_inserter(ptrs), [](const animation<T>& a) { return a.m_impl; });
         return animation<T>(std::make_shared<impl<T>>(std::move(ptrs)));
     }
 };
@@ -489,3 +491,5 @@ static constexpr inline auto gradual = gradual_fn{};
 static constexpr inline auto slice = slice_fn{};
 static constexpr inline auto rescale = rescale_fn{};
 static constexpr inline auto sequence = sequence_fn{};
+
+}  // namespace anim
