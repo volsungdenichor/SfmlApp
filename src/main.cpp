@@ -219,7 +219,7 @@ auto grid(const vec_t& size, const vec_t& dist) -> canvas_item
     };
 }
 
-auto triangle(const std::array<vec_t, 3>& vertices)
+auto triangle(const std::array<vec_t, 3>& vertices) -> canvas_item
 {
     return [=](const state_t& state, context_t& ctx)
     {
@@ -233,10 +233,27 @@ auto triangle(const std::array<vec_t, 3>& vertices)
     };
 }
 
-auto triangle(const vec_t& a, const vec_t& b, const vec_t& c)
+auto triangle(const vec_t& a, const vec_t& b, const vec_t& c) -> canvas_item
 {
     return triangle({ a, b, c });
 }
+
+template <class Func, class In>
+auto map(Func&& func, const In& source) -> canvas_item
+{
+    std::vector<canvas_item> items;
+    for (const auto& item : source)
+    {
+        items.push_back(std::invoke(func, item));
+    }
+    return [=](const state_t& state, context_t& ctx)
+    {
+        for (const auto& item : items)
+        {
+            item(state, ctx);
+        }
+    };
+};
 
 }  // namespace foo
 
@@ -283,6 +300,11 @@ void run()
                 foo::translate(
                     { 1000, 600 },
                     foo::outline_thickness(0.F, foo::fill_color(sf::Color::White, foo::text(std::to_string(fps))))),
+                foo::map(
+                    [](int x) -> foo::canvas_item {
+                        return foo::translate({ 100.F * x, 50.F * x }, foo::fill_color(sf::Color::Blue, foo::circle(10.F)));
+                    },
+                    std::vector<int>{ 0, 1, 2, 4, 7, 8 }),
                 foo::translate(
                     { 200, 0 },
                     foo::scale(
