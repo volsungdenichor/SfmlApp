@@ -149,10 +149,8 @@ auto rotate(float a, const vec_t& pivot) -> state_modifier
     return translate(pivot) | rotate(a) | translate(-pivot);
 }
 
-template <class... Args>
-auto group(Args&&... args) -> canvas_item
+auto group(std::vector<canvas_item> items) -> canvas_item
 {
-    std::vector<canvas_item> items{ canvas_item(args)... };
     return [=](const state_t& state, context_t& ctx)
     {
         for (const auto& item : items)
@@ -160,6 +158,13 @@ auto group(Args&&... args) -> canvas_item
             item(state, ctx);
         }
     };
+}
+
+template <class... Tail>
+auto group(canvas_item head, Tail... tail) -> canvas_item
+{
+    std::vector<canvas_item> items{ std::move(head), canvas_item(std::move(tail))... };
+    return group(std::move(items));
 }
 
 auto text(const sf::String& str) -> canvas_item
