@@ -2,14 +2,13 @@
 
 #include <SFML/Graphics/RenderWindow.hpp>
 #include <SFML/Window.hpp>
-
-#include "defs.hpp"
+#include <ferrugo/core/functional.hpp>
 
 inline void run_app(
     sf::RenderWindow& window,
-    const action_t<sf::RenderWindow&, const sf::Event&>& event_handler,
-    const action_t<float>& updater,
-    const action_t<sf::RenderWindow&, float>& renderer,
+    const ferrugo::core::action_t<sf::RenderWindow&, const sf::Event&>& event_handler,
+    const ferrugo::core::action_t<float>& updater,
+    const ferrugo::core::action_t<sf::RenderWindow&, float>& renderer,
     float time_per_frame)
 {
     sf::Clock clock;

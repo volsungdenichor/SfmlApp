@@ -2,13 +2,12 @@
 
 #include <SFML/Graphics/RenderWindow.hpp>
 #include <SFML/Window.hpp>
-
-#include "defs.hpp"
+#include <ferrugo/core/functional.hpp>
 
 struct event_handler_t
 {
     template <class... Args>
-    using handler_t = action_t<sf::RenderWindow&, Args...>;
+    using handler_t = ferrugo::core::action_t<sf::RenderWindow&, Args...>;
 
     using size_handler_t = handler_t<sf::Event::SizeEvent>;
     using key_handler_t = handler_t<sf::Event::KeyEvent>;

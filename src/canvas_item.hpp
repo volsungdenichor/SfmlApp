@@ -6,7 +6,6 @@
 #include <cstdint>
 #include <functional>
 
-#include "defs.hpp"
 #include "vec_t.hpp"
 
 namespace foo
@@ -41,7 +40,7 @@ struct context_t
 };
 
 using canvas_item = std::function<void(const state_t&, context_t&)>;
-using state_modifier = action_t<state_t&>;
+using state_modifier = ferrugo::core::action_t<state_t&>;
 
 auto operator|(const state_modifier& lhs, const state_modifier& rhs) -> state_modifier
 {
@@ -69,7 +68,7 @@ void apply_style(sf::Shape& shape, const style_t& style)
     shape.setOutlineThickness(style.outline_thickness);
 }
 
-auto modify_state(const canvas_item& item, const action_t<state_t&>& op) -> canvas_item
+auto modify_state(const canvas_item& item, const ferrugo::core::applier_t<state_t>& op) -> canvas_item
 {
     return [=](const state_t& state, context_t& ctx)
     {
@@ -114,6 +113,15 @@ auto outline_color(const sf::Color& color) -> state_modifier
     return [=](state_t& state) { state.style.outline_color = color; };
 }
 
+auto color(const sf::Color& color) -> state_modifier
+{
+    return [=](state_t& state)
+    {
+        state.style.outline_color = color;
+        state.style.fill_color = color;
+    };
+}
+
 auto outline_thickness(float value) -> state_modifier
 {
     return [=](state_t& state) { state.style.outline_thickness = value; };
@@ -126,12 +134,12 @@ auto font(const sf::Font& value) -> state_modifier
 
 auto translate(const vec_t& v) -> state_modifier
 {
-    return [=](state_t& state) { state.render_states.transform.translate(v); };
+    return [=](state_t& state) { state.render_states.transform.translate(convert(v)); };
 }
 
 auto scale(const vec_t& v) -> state_modifier
 {
-    return [=](state_t& state) { state.render_states.transform.scale(v); };
+    return [=](state_t& state) { state.render_states.transform.scale(convert(v)); };
 }
 
 auto scale(const vec_t& v, const vec_t& pivot) -> state_modifier
@@ -192,7 +200,7 @@ auto rect(const vec_t& size) -> canvas_item
 {
     return [=](const state_t& state, context_t& ctx)
     {
-        sf::RectangleShape shape(size);
+        sf::RectangleShape shape(convert(size));
         apply_style(shape, state.style);
         ctx.target->draw(shape, state.render_states);
     };
@@ -251,7 +259,7 @@ auto triangle(const std::array<vec_t, 3>& vertices) -> canvas_item
         sf::VertexArray shape(sf::PrimitiveType::Triangles, 3);
         for (std::size_t i = 0; i < 3; ++i)
         {
-            shape[i].position = vertices[i];
+            shape[i].position = convert(vertices[i]);
             shape[i].color = state.style.fill_color;
         }
         ctx.target->draw(shape, state.render_states);
@@ -271,37 +279,11 @@ auto polygon(const std::vector<vec_t>& vertices) -> canvas_item
         shape.setPointCount(vertices.size());
         for (std::size_t i = 0; i < vertices.size(); ++i)
         {
-            shape.setPoint(i, vertices[i]);
+            shape.setPoint(i, convert(vertices[i]));
         }
         apply_style(shape, state.style);
         ctx.target->draw(shape, state.render_states);
     };
-}
-
-auto map(
-    const std::function<canvas_item(std::size_t, std::size_t, const canvas_item&)>& func,
-    const std::vector<canvas_item>& items) -> canvas_item
-{
-    return [=](const state_t& state, context_t& ctx)
-    {
-        for (std::size_t i = 0; i < items.size(); ++i)
-        {
-            func(i, items.size(), items[i])(state, ctx);
-        }
-    };
-}
-
-auto repeat(
-    const std::function<canvas_item(std::size_t, std::size_t, const canvas_item&)>& func,
-    const canvas_item& item,
-    std::size_t count) -> canvas_item
-{
-    return map(func, std::vector<canvas_item>(count, item));
-}
-
-auto distribute(const vec_t& dist) -> std::function<canvas_item(std::size_t, std::size_t, const canvas_item&)>
-{
-    return [=](std::size_t n, std::size_t, const canvas_item& item) -> canvas_item { return item | translate(n * dist); };
 }
 
 }  // namespace foo
