@@ -2,9 +2,9 @@
 
 #include <SFML/System.hpp>
 #include <array>
-#include <ferrugo/geo/matrix.hpp>
+#include <ferrugo/alg/matrix.hpp>
 
-using vec_t = ferrugo::geo::vector_2d<float>;
+using vec_t = ferrugo::alg::vector_2d<float>;
 
 inline sf::Vector2f convert(const vec_t& v)
 {
