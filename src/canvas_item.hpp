@@ -68,12 +68,12 @@ inline void apply_style(sf::Shape& shape, const style_t& style)
     shape.setOutlineThickness(style.outline_thickness);
 }
 
-inline auto modify_state(const canvas_item& item, const std::function<void(state_t&)>& op) -> canvas_item
+inline auto modify_state(const canvas_item& item, const state_modifier& modifier) -> canvas_item
 {
     return [=](const state_t& state, context_t& ctx)
     {
         state_t new_state = state;
-        op(new_state);
+        modifier(new_state);
         item(new_state, ctx);
     };
 };
@@ -115,11 +115,7 @@ inline auto outline_color(const sf::Color& color) -> state_modifier
 
 inline auto color(const sf::Color& color) -> state_modifier
 {
-    return [=](state_t& state)
-    {
-        state.style.outline_color = color;
-        state.style.fill_color = color;
-    };
+    return fill_color(color) | outline_color(color);
 }
 
 inline auto outline_thickness(float value) -> state_modifier
