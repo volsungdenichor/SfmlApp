@@ -86,6 +86,8 @@ void run()
     const sf::Font arial = load_font(R"(/mnt/c/Windows/Fonts/arial.ttf)");
     const sf::Font verdana = load_font(R"(/mnt/c/Windows/Fonts/verdana.ttf)");
 
+    using namespace ferrugo;
+
     run_app(
         window,
         event_handler,
@@ -94,26 +96,27 @@ void run()
             [&](const vec_t& size, float fps) -> foo::canvas_item
             {
                 return foo::group(
-                    foo::grid(size, vec_t{ 100.F, 100.F }) | foo::outline_color(sf::Color(64, 0, 0)),
-                    foo::group(ferrugo::seq::init(
-                        15,
-                        [](int x) -> foo::canvas_item
-                        {
-                            auto shape = x % 2 == 0 ? foo::circle(50.F) : foo::rect(vec_t{ 100.F, 100.F });
-                            return shape                                        //
-                                   | foo::translate(vec_t{ 150.F * x, 500.F })  //
-                                   | foo::color(sf::Color(200, 120, 140));
-                        })),
-                    foo::group(
-                        ferrugo::seq::repeat(foo::circle(50.F))  //
-                        |= ferrugo::seq::take(3)                 //
-                        |= ferrugo::seq::transform_i(
-                            [](int i, const foo::canvas_item& item)
-                            {
-                                return item                                   //
-                                       | foo::translate(vec_t{ 0, 125 } * i)  //
-                                       | foo::color(sf::Color::Red);
-                            })));
+                           foo::grid(size, vec_t{ 100.F, 100.F }) | foo::outline_color(sf::Color(64, 0, 0)),
+                           foo::group(seq::init(
+                               15,
+                               [](int x) -> foo::canvas_item
+                               {
+                                   auto shape = x % 2 == 0 ? foo::circle(50.F) : foo::rect(vec_t{ 100.F, 100.F });
+                                   return shape                                        //
+                                          | foo::translate(vec_t{ 150.F * x, 500.F })  //
+                                          | foo::color(sf::Color(200, 120, 140));
+                               })),
+                           foo::group(
+                               seq::repeat(foo::circle(50.F))  //
+                               |= seq::take(3)                 //
+                               |= seq::transform_i(
+                                   [](int i, const foo::canvas_item& item) -> foo::canvas_item
+                                   {
+                                       return item                                   //
+                                              | foo::translate(vec_t{ 0, 125 } * i)  //
+                                              | foo::color(sf::Color::Red);
+                                   })))
+                       | foo::rotate(angle, vec_t{ 960.F, 540.F });
             },
             &verdana),
         0.01F);

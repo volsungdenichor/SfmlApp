@@ -40,9 +40,9 @@ struct context_t
 };
 
 using canvas_item = std::function<void(const state_t&, context_t&)>;
-using state_modifier = ferrugo::core::action_t<state_t&>;
+using state_modifier = std::function<void(state_t&)>;
 
-auto operator|(const state_modifier& lhs, const state_modifier& rhs) -> state_modifier
+inline auto operator|(const state_modifier& lhs, const state_modifier& rhs) -> state_modifier
 {
     return [=](state_t& state)
     {
@@ -51,7 +51,7 @@ auto operator|(const state_modifier& lhs, const state_modifier& rhs) -> state_mo
     };
 }
 
-auto operator|(const canvas_item& item, const state_modifier& modifier) -> canvas_item
+inline auto operator|(const canvas_item& item, const state_modifier& modifier) -> canvas_item
 {
     return [=](const state_t& state, context_t& ctx)
     {
@@ -61,14 +61,14 @@ auto operator|(const canvas_item& item, const state_modifier& modifier) -> canva
     };
 }
 
-void apply_style(sf::Shape& shape, const style_t& style)
+inline void apply_style(sf::Shape& shape, const style_t& style)
 {
     shape.setFillColor(style.fill_color);
     shape.setOutlineColor(style.outline_color);
     shape.setOutlineThickness(style.outline_thickness);
 }
 
-auto modify_state(const canvas_item& item, const ferrugo::core::applier_t<state_t>& op) -> canvas_item
+inline auto modify_state(const canvas_item& item, const std::function<void(state_t&)>& op) -> canvas_item
 {
     return [=](const state_t& state, context_t& ctx)
     {
@@ -78,42 +78,42 @@ auto modify_state(const canvas_item& item, const ferrugo::core::applier_t<state_
     };
 };
 
-auto text_style(std::uint32_t value) -> state_modifier
+inline auto text_style(std::uint32_t value) -> state_modifier
 {
     return [=](state_t& state) { state.text_style.style = value; };
 }
 
-auto bold() -> state_modifier
+inline auto bold() -> state_modifier
 {
     return [=](state_t& state) { state.text_style.style |= sf::Text::Bold; };
 }
 
-auto italic() -> state_modifier
+inline auto italic() -> state_modifier
 {
     return [=](state_t& state) { state.text_style.style |= sf::Text::Italic; };
 }
 
-auto underlined() -> state_modifier
+inline auto underlined() -> state_modifier
 {
     return [=](state_t& state) { state.text_style.style |= sf::Text::Underlined; };
 }
 
-auto blend(sf::BlendMode mode) -> state_modifier
+inline auto blend(sf::BlendMode mode) -> state_modifier
 {
     return [=](state_t& state) { state.render_states.blendMode = mode; };
 }
 
-auto fill_color(const sf::Color& color) -> state_modifier
+inline auto fill_color(const sf::Color& color) -> state_modifier
 {
     return [=](state_t& state) { state.style.fill_color = color; };
 }
 
-auto outline_color(const sf::Color& color) -> state_modifier
+inline auto outline_color(const sf::Color& color) -> state_modifier
 {
     return [=](state_t& state) { state.style.outline_color = color; };
 }
 
-auto color(const sf::Color& color) -> state_modifier
+inline auto color(const sf::Color& color) -> state_modifier
 {
     return [=](state_t& state)
     {
@@ -122,42 +122,42 @@ auto color(const sf::Color& color) -> state_modifier
     };
 }
 
-auto outline_thickness(float value) -> state_modifier
+inline auto outline_thickness(float value) -> state_modifier
 {
     return [=](state_t& state) { state.style.outline_thickness = value; };
 }
 
-auto font(const sf::Font& value) -> state_modifier
+inline auto font(const sf::Font& value) -> state_modifier
 {
     return [&](state_t& state) { state.text_style.font = &value; };
 }
 
-auto translate(const vec_t& v) -> state_modifier
+inline auto translate(const vec_t& v) -> state_modifier
 {
     return [=](state_t& state) { state.render_states.transform.translate(convert(v)); };
 }
 
-auto scale(const vec_t& v) -> state_modifier
+inline auto scale(const vec_t& v) -> state_modifier
 {
     return [=](state_t& state) { state.render_states.transform.scale(convert(v)); };
 }
 
-auto scale(const vec_t& v, const vec_t& pivot) -> state_modifier
+inline auto scale(const vec_t& v, const vec_t& pivot) -> state_modifier
 {
     return translate(pivot) | scale(v) | translate(-pivot);
 }
 
-auto rotate(float a) -> state_modifier
+inline auto rotate(float a) -> state_modifier
 {
     return [=](state_t& state) { state.render_states.transform.rotate(a); };
 }
 
-auto rotate(float a, const vec_t& pivot) -> state_modifier
+inline auto rotate(float a, const vec_t& pivot) -> state_modifier
 {
     return translate(pivot) | rotate(a) | translate(-pivot);
 }
 
-auto group(std::vector<canvas_item> items) -> canvas_item
+inline auto group(std::vector<canvas_item> items) -> canvas_item
 {
     return [=](const state_t& state, context_t& ctx)
     {
@@ -175,7 +175,7 @@ auto group(canvas_item head, Tail... tail) -> canvas_item
     return group(std::move(items));
 }
 
-auto text(const sf::String& str) -> canvas_item
+inline auto text(const sf::String& str) -> canvas_item
 {
     return [=](const state_t& state, context_t& ctx)
     {
@@ -196,7 +196,7 @@ auto text(const sf::String& str) -> canvas_item
     };
 }
 
-auto rect(const vec_t& size) -> canvas_item
+inline auto rect(const vec_t& size) -> canvas_item
 {
     return [=](const state_t& state, context_t& ctx)
     {
@@ -206,7 +206,7 @@ auto rect(const vec_t& size) -> canvas_item
     };
 }
 
-auto circle(float r) -> canvas_item
+inline auto circle(float r) -> canvas_item
 {
     return [=](const state_t& state, context_t& ctx)
     {
@@ -216,7 +216,7 @@ auto circle(float r) -> canvas_item
     };
 }
 
-auto sprite(const sf::Texture& texture, const sf::IntRect& rect) -> canvas_item
+inline auto sprite(const sf::Texture& texture, const sf::IntRect& rect) -> canvas_item
 {
     return [&texture, rect](const state_t& state, context_t& ctx)
     {
@@ -227,7 +227,7 @@ auto sprite(const sf::Texture& texture, const sf::IntRect& rect) -> canvas_item
     };
 }
 
-auto grid(const vec_t& size, const vec_t& dist) -> canvas_item
+inline auto grid(const vec_t& size, const vec_t& dist) -> canvas_item
 {
     return [=](const state_t& state, context_t& ctx)
     {
@@ -252,7 +252,7 @@ auto grid(const vec_t& size, const vec_t& dist) -> canvas_item
     };
 }
 
-auto triangle(const std::array<vec_t, 3>& vertices) -> canvas_item
+inline auto triangle(const std::array<vec_t, 3>& vertices) -> canvas_item
 {
     return [=](const state_t& state, context_t& ctx)
     {
@@ -266,12 +266,12 @@ auto triangle(const std::array<vec_t, 3>& vertices) -> canvas_item
     };
 }
 
-auto triangle(const vec_t& a, const vec_t& b, const vec_t& c) -> canvas_item
+inline auto triangle(const vec_t& a, const vec_t& b, const vec_t& c) -> canvas_item
 {
     return triangle({ a, b, c });
 }
 
-auto polygon(const std::vector<vec_t>& vertices) -> canvas_item
+inline auto polygon(const std::vector<vec_t>& vertices) -> canvas_item
 {
     return [=](const state_t& state, context_t& ctx)
     {
