@@ -13,7 +13,7 @@
 #include "animation.hpp"
 #include "app_runner.hpp"
 #include "canvas_item.hpp"
-#include "event_handler_t.hpp"
+#include "event_handler.hpp"
 #include "vec_t.hpp"
 
 sf::Texture load_texture(const std::string& path)
@@ -36,8 +36,8 @@ sf::Font load_font(const std::string& path)
     return result;
 }
 
-ferrugo::core::action_t<sf::RenderWindow&, float> render_scene(
-    const std::function<foo::canvas_item(const vec_t&, float)>& scene_builder, const sf::Font* default_font)
+render_fn render_scene(
+    const std::function<foo::canvas_item_t(const vec_t&, float)>& scene_builder, const sf::Font* default_font)
 {
     return [=](sf::RenderWindow& w, float fps)
     {
@@ -45,7 +45,7 @@ ferrugo::core::action_t<sf::RenderWindow&, float> render_scene(
         foo::context_t ctx{ &w };
         foo::state_t state{};
         state.text_style.font = default_font;
-        const foo::canvas_item scene = scene_builder(size, fps);
+        const foo::canvas_item_t scene = scene_builder(size, fps);
         scene(state, ctx);
     };
 }
@@ -93,13 +93,13 @@ void run()
         event_handler,
         [&](float dt) { angle += dt * rotation_speed * acceleration; },
         render_scene(
-            [&](const vec_t& size, float fps) -> foo::canvas_item
+            [&](const vec_t& size, float fps) -> foo::canvas_item_t
             {
                 return foo::group(
                            foo::grid(size, vec_t{ 100.F, 100.F }) | foo::outline_color(sf::Color(64, 0, 0)),
                            foo::group(seq::init(
                                15,
-                               [](int x) -> foo::canvas_item
+                               [](int x) -> foo::canvas_item_t
                                {
                                    auto shape = x % 2 == 0 ? foo::circle(50.F) : foo::rect(vec_t{ 100.F, 100.F });
                                    return shape                                        //
@@ -110,7 +110,7 @@ void run()
                                seq::repeat(foo::circle(50.F))  //
                                |= seq::take(3)                 //
                                |= seq::transform_i(
-                                   [](int i, const foo::canvas_item& item) -> foo::canvas_item
+                                   [](int i, const foo::canvas_item_t& item) -> foo::canvas_item_t
                                    {
                                        return item                                   //
                                               | foo::translate(vec_t{ 0, 125 } * i)  //
