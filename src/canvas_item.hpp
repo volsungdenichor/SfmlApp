@@ -39,8 +39,17 @@ struct context_t
     sf::RenderTarget* target;
 };
 
-using canvas_item_t = std::function<void(const state_t&, context_t&)>;
-using state_modifier_t = std::function<void(state_t&)>;
+struct canvas_item_t : public std::function<void(const state_t&, context_t&)>
+{
+    using base_t = std::function<void(const state_t&, context_t&)>;
+    using base_t::base_t;
+};
+
+struct state_modifier_t : public std::function<void(state_t&)>
+{
+    using base_t = std::function<void(state_t&)>;
+    using base_t::base_t;
+};
 
 inline auto operator|(const state_modifier_t& lhs, const state_modifier_t& rhs) -> state_modifier_t
 {

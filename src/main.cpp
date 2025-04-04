@@ -3,7 +3,7 @@
 #include <cmath>
 #include <cstdint>
 #include <ferrugo/core/functional.hpp>
-#include <ferrugo/seq/seq.hpp>
+#include <ferrugo/core/sequence.hpp>
 #include <functional>
 #include <iomanip>
 #include <iostream>
@@ -97,7 +97,7 @@ void run()
             {
                 return foo::group(
                            foo::grid(size, vec_t{ 100.F, 100.F }) | foo::outline_color(sf::Color(64, 0, 0)),
-                           foo::group(seq::init(
+                           foo::group(core::init(
                                15,
                                [](int x) -> foo::canvas_item_t
                                {
@@ -106,16 +106,15 @@ void run()
                                           | foo::translate(vec_t{ 150.F * x, 500.F })  //
                                           | foo::color(sf::Color(200, 120, 140));
                                })),
-                           foo::group(
-                               seq::repeat(foo::circle(50.F))  //
-                               |= seq::take(3)                 //
-                               |= seq::transform_i(
-                                   [](int i, const foo::canvas_item_t& item) -> foo::canvas_item_t
-                                   {
-                                       return item                                   //
-                                              | foo::translate(vec_t{ 0, 125 } * i)  //
-                                              | foo::color(sf::Color::Red);
-                                   })))
+                           foo::group(core::repeat(foo::circle(50.F))  //
+                                          .take(3)                     //
+                                          .transform_indexed(
+                                              [](int i, const foo::canvas_item_t& item) -> foo::canvas_item_t
+                                              {
+                                                  return item                                   //
+                                                         | foo::translate(vec_t{ 0, 125 } * i)  //
+                                                         | foo::color(sf::Color::Red);
+                                              })))
                        | foo::rotate(angle, vec_t{ 960.F, 540.F });
             },
             &verdana),
