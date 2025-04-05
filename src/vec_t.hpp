@@ -5,6 +5,7 @@
 #include <ferrugo/alg/matrix.hpp>
 
 using vec_t = ferrugo::alg::vector_2d<float>;
+using box_t = vec_t;
 
 inline sf::Vector2f convert(const vec_t& v)
 {

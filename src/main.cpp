@@ -36,27 +36,33 @@ sf::Font load_font(const std::string& path)
     return result;
 }
 
-render_fn render_scene(
-    const std::function<foo::canvas_item_t(const vec_t&, float)>& scene_builder, const sf::Font* default_font)
+using scene_builder_fn = std::function<foo::canvas_item_t(const box_t&, fps_t)>;
+
+render_fn render_scene(const scene_builder_fn& scene_builder, const sf::Font* default_font)
 {
-    return [=](sf::RenderWindow& w, float fps)
+    return [=](sf::RenderWindow& w, fps_t fps)
     {
-        const auto size = vec_t{ float(w.getSize().x), float(w.getSize().y) };
+        const auto box = box_t{ float(w.getSize().x), float(w.getSize().y) };
         foo::context_t ctx{ &w };
         foo::state_t state{};
         state.text_style.font = default_font;
-        const foo::canvas_item_t scene = scene_builder(size, fps);
+        const foo::canvas_item_t scene = scene_builder(box, fps);
         scene(state, ctx);
     };
 }
+
+struct state_t
+{
+    int acceleration = 1;
+    float rotation_speed = 30.F;
+    float angle = 0.F;
+};
 
 void run()
 {
     auto window = sf::RenderWindow{ { 1920u, 1080u }, "CMake SFML Project" };
 
-    int acceleration = 1;
-    float rotation_speed = 30.F;
-    float angle = 0.F;
+    auto state = state_t{};
 
     event_handler_t event_handler{};
     event_handler.on_close = [](sf::RenderWindow& w) { w.close(); };
@@ -67,18 +73,19 @@ void run()
             w.close();
         }
         if (e.code == sf::Keyboard::Space)
+
         {
-            rotation_speed = -rotation_speed;
+            state.rotation_speed = -state.rotation_speed;
         }
         if (e.code == sf::Keyboard::Tab)
         {
-            if (acceleration == 16)
+            if (state.acceleration == 16)
             {
-                acceleration = 1;
+                state.acceleration = 1;
             }
             else
             {
-                acceleration *= 2;
+                state.acceleration *= 2;
             }
         }
     };
@@ -88,15 +95,17 @@ void run()
 
     using namespace ferrugo;
 
+    const auto frame_duration = duration_t{ 0.01F };
+
     run_app(
         window,
         event_handler,
-        [&](float dt) { angle += dt * rotation_speed * acceleration; },
+        [&](duration_t dt) { state.angle += dt * state.rotation_speed * state.acceleration; },
         render_scene(
-            [&](const vec_t& size, float fps) -> foo::canvas_item_t
+            [&](const box_t& box, fps_t fps) -> foo::canvas_item_t
             {
                 return foo::group(
-                           foo::grid(size, vec_t{ 100.F, 100.F }) | foo::outline_color(sf::Color(64, 0, 0)),
+                           foo::grid(box, vec_t{ 100.F, 100.F }) | foo::outline_color(sf::Color(64, 0, 0)),
                            foo::group(core::init(
                                15,
                                [](int x) -> foo::canvas_item_t
@@ -115,10 +124,10 @@ void run()
                                                          | foo::translate(vec_t{ 0, 125 } * i)  //
                                                          | foo::color(sf::Color::Red);
                                               })))
-                       | foo::rotate(angle, vec_t{ 960.F, 540.F });
+                       | foo::rotate(state.angle, vec_t{ 960.F, 540.F });
             },
             &verdana),
-        0.01F);
+        frame_duration);
 }
 
 int main()
