@@ -43,11 +43,11 @@ render_fn render_scene(const scene_builder_fn& scene_builder, const sf::Font* de
     return [=](sf::RenderWindow& w, fps_t fps)
     {
         const auto box = box_t{ float(w.getSize().x), float(w.getSize().y) };
-        foo::context_t ctx{ &w };
+        foo::context_t ctx{ w };
         foo::state_t state{};
         state.text_style.font = default_font;
         const foo::canvas_item_t scene = scene_builder(box, fps);
-        scene(state, ctx);
+        scene(ctx, state);
     };
 }
 
@@ -123,7 +123,9 @@ void run()
                                                   return item                                   //
                                                          | foo::translate(vec_t{ 0, 125 } * i)  //
                                                          | foo::color(sf::Color::Red);
-                                              })))
+                                              })),
+                           foo::text("Hello") | foo::color(sf::Color::Blue) | foo::bold()
+                               | foo::translate(vec_t{ 150.F, 500.F }))
                        | foo::rotate(state.angle, vec_t{ 960.F, 540.F });
             },
             &verdana),
