@@ -13,21 +13,26 @@ struct TickEvent
     duration_t elapsed;
 };
 
+struct InitEvent
+{
+};
+
 template <class Model, class Msg>
 struct App
 {
+    using Event = std::variant<sf::Event, TickEvent, InitEvent>;
     using UpdateResult = std::tuple<Model, std::optional<Msg>>;
     using RenderFn = std::function<void(const Model&, sf::RenderWindow&)>;
-    using InitFn = std::function<std::optional<Msg>(const Model&)>;
-    using HandleEventFn = std::function<UpdateResult(const Model&, const std::variant<sf::Event, TickEvent>&)>;
+    using HandleEventFn = std::function<UpdateResult(const Model&, const Event&)>;
     using UpdateFn = std::function<UpdateResult(const Model&, const Msg&)>;
+    using HandleMsgFn = std::function<void(sf::RenderWindow&, const Msg&)>;
 
     sf::RenderWindow& m_window;
     Model m_model_state;
     RenderFn render = {};
-    InitFn on_init = {};
     HandleEventFn m_handle_event;
     UpdateFn m_update;
+    HandleMsgFn m_handle_msg;
     std::deque<Msg> m_msg_queue;
     duration_t m_frame_duration = duration_t{ 0.01 };
 
@@ -46,14 +51,7 @@ struct App
         sf::Clock clock;
         duration_t time_since_last_update = 0.F;
 
-        if (on_init)
-        {
-            auto maybe_msg = on_init(m_model_state);
-            if (maybe_msg)
-            {
-                m_msg_queue.push_back(*maybe_msg);
-            }
-        }
+        handle_event(m_handle_event(m_model_state, InitEvent{}));
 
         while (m_window.isOpen())
         {
@@ -81,6 +79,10 @@ struct App
                 {
                     Msg msg = m_msg_queue.front();
                     m_msg_queue.pop_front();
+                    if (m_handle_msg)
+                    {
+                        m_handle_msg(m_window, msg);
+                    }
                     handle_event(m_update(m_model_state, msg));
                 }
             }

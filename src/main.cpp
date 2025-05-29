@@ -106,7 +106,12 @@ struct ModelEventHandler
         return { std::move(m), {} };
     }
 
-    auto operator()(Model m, const std::variant<sf::Event, TickEvent>& event) const
+    auto operator()(Model m, const InitEvent& event) const -> std::tuple<Model, std::optional<Command>>
+    {
+        return { std::move(m), Command::init };
+    }
+
+    auto operator()(Model m, const std::variant<sf::Event, TickEvent, InitEvent>& event) const
         -> std::tuple<Model, std::optional<Command>>
     {
         if (const auto e = std::get_if<sf::Event>(&event))
@@ -114,6 +119,10 @@ struct ModelEventHandler
             return (*this)(std::move(m), *e);
         }
         if (const auto e = std::get_if<TickEvent>(&event))
+        {
+            return (*this)(std::move(m), *e);
+        }
+        if (const auto e = std::get_if<InitEvent>(&event))
         {
             return (*this)(std::move(m), *e);
         }
@@ -167,7 +176,16 @@ void run()
                     | foo::rotate(m.angle, { 512, 384 }));
         });
 
-    app.on_init = [](const Model& m) -> std::optional<Command> { return Command::init; };
+    app.m_handle_msg = [](sf::RenderWindow& w, const Command& cmd)
+    {
+        if (cmd == Command::exit)
+        {
+            std::cout << "I want to exit!"
+                      << "\n";
+            w.close();
+        }
+    };
+
     app.m_update = [&](Model m, const Command& cmd) -> std::tuple<Model, std::optional<Command>>
     {
         if (cmd == Command::init)
@@ -184,13 +202,6 @@ void run()
         if (cmd == Command::down)
         {
             m.angular_acceleration = -1;
-            return { m, {} };
-        }
-        if (cmd == Command::exit)
-        {
-            std::cout << "I want to exit!"
-                      << "\n";
-            window.close();
             return { m, {} };
         }
         return { m, {} };
