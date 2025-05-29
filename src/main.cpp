@@ -2,7 +2,6 @@
 #include <SFML/Window.hpp>
 #include <cmath>
 #include <cstdint>
-#include <deque>
 #include <ferrugo/core/functional.hpp>
 #include <ferrugo/core/sequence.hpp>
 #include <functional>
@@ -10,17 +9,22 @@
 #include <iostream>
 #include <memory>
 #include <sstream>
-#include <variant>
 
 #include "animation.hpp"
-// #include "app_runner.hpp"
+#include "app_runner.hpp"
 #include "canvas_item.hpp"
-#include "event_handler.hpp"
+// #include "event_handler.hpp"
 #include "vec_t.hpp"
 
-using namespace foo;
+template <class... Args>
+auto str(Args&&... args) -> std::string
+{
+    std::stringstream ss;
+    (ss << ... << std::forward<Args>(args));
+    return ss.str();
+}
 
-sf::Texture load_texture(const std::string& path)
+inline auto load_texture(const std::string& path) -> sf::Texture
 {
     sf::Texture result{};
     if (!result.loadFromFile(path))
@@ -30,258 +34,170 @@ sf::Texture load_texture(const std::string& path)
     return result;
 }
 
-sf::Font load_font(const std::string& path)
+inline auto load_font(const std::string& path) -> sf::Font
 {
     sf::Font result{};
-    if (!result.loadFromFile(path))
+    if (!result.openFromFile(path))
     {
         throw std::runtime_error{ "Unable to load font from " + path };
     }
     return result;
 }
 
-using duration_t = float;
-
-struct TickEvent
-{
-    duration_t delta;
-};
-
-using Command = std::string;
-// using Event = std::variant<sf::Event, TickEvent>;
-
-struct View
-{
-    sf::RenderWindow& m_window;
-    const sf::Font* m_font = nullptr;
-
-    auto poll_event() -> std::optional<sf::Event>
-    {
-        sf::Event event{};
-        if (m_window.pollEvent(event))
-        {
-            return std::optional<sf::Event>{ std::move(event) };
-        }
-        return std::optional<sf::Event>{};
-    }
-
-    auto is_open() const
-    {
-        return m_window.isOpen();
-    }
-
-    void close() const
-    {
-        m_window.close();
-    }
-
-    void handle_command(const Command& command)
-    {
-        if (!command.empty())
-        {
-            std::cout << "model -> view: " << command << "\n";
-        }
-        if (command == "exit")
-        {
-            m_window.close();
-        }
-        if (command == "no_font")
-        {
-            m_font = nullptr;
-        }
-    }
-
-    void render(const CanvasItem& canvas_item)
-    {
-        m_window.clear();
-        Context ctx{ m_window };
-        State state{};
-        state.text_style.font = m_font;
-        canvas_item(ctx, state);
-        m_window.display();
-    }
-};
-
-template <class Model, class Event, class Command>
-struct App
-{
-    using MaybeCommand = std::optional<Command>;
-    using MaybeEvent = std::optional<Event>;
-    using UpdateFn = std::function<std::tuple<Model, MaybeCommand>(const Model&, const Event&)>;
-    using InitFn = std::function<MaybeCommand(const Model&)>;
-    using EventHandlerFn = std::function<MaybeEvent(const std::variant<sf::Event, TickEvent>&)>;
-
-    using CreateViewFn = std::function<CanvasItem(const Model&)>;
-
-    Model m_model_state;
-    View m_view;
-    InitFn m_init;
-    UpdateFn m_update;
-    EventHandlerFn m_event_handler;
-    CreateViewFn m_create_view;
-    duration_t m_frame_duration = 0.01F;
-    std::deque<Event> m_event_queue;
-
-    void run()
-    {
-        sf::Clock clock;
-        duration_t time_since_last_update = 0.F;
-
-        const auto maybe_initial_command = m_init(m_model_state);
-        if (maybe_initial_command)
-        {
-            m_view.handle_command(*maybe_initial_command);
-        }
-
-        while (m_view.is_open())
-        {
-            const duration_t elapsed = clock.restart().asSeconds();
-            time_since_last_update += elapsed;
-
-            // const fps_t fps = 1.0F / elapsed;
-
-            while (time_since_last_update > m_frame_duration)
-            {
-                time_since_last_update -= m_frame_duration;
-
-                while (std::optional<sf::Event> sf_event = m_view.poll_event())
-                {
-                    if (sf_event->type == sf::Event::Closed)
-                    {
-                        m_view.close();
-                    }
-                    if (const std::optional<Event> maybe_event = m_event_handler(*sf_event))
-                    {
-                        m_event_queue.push_back(*maybe_event);
-                    }
-                }
-
-                if (const std::optional<Event> maybe_event = m_event_handler(TickEvent{ m_frame_duration }))
-                {
-                    m_event_queue.push_back(*maybe_event);
-                }
-            }
-
-            while (!m_event_queue.empty())
-            {
-                Event event = m_event_queue.front();
-                m_event_queue.pop_front();
-                auto [new_model_state, maybe_command] = m_update(m_model_state, event);
-                if (maybe_command)
-                {
-                    m_view.handle_command(*maybe_command);
-                }
-                m_model_state = std::move(new_model_state);
-            }
-
-            m_view.render(m_create_view(m_model_state));
-        }
-    }
-};
-
 struct Model
 {
-    float angle;
-    float velocity;
+    int angular_acceleration = 0;
+    float angular_velocity = 0;
+    float angle = 0.F;
+    float max_angular_velocity;
 };
+
+enum class Command
+{
+    init,
+    exit,
+    up,
+    down
+};
+
+struct ModelEventHandler
+{
+    auto operator()(Model m, const sf::Event::KeyPressed& e) const -> std::tuple<Model, std::optional<Command>>
+    {
+        if (e.code == sf::Keyboard::Key::Escape)
+        {
+            return { std::move(m), Command::exit };
+        }
+        if (e.code == sf::Keyboard::Key::Up)
+        {
+            return { std::move(m), Command::up };
+        }
+        if (e.code == sf::Keyboard::Key::Down)
+        {
+            return { m, Command::down };
+        }
+        return { std::move(m), {} };
+    }
+
+    auto operator()(Model m, const sf::Event::KeyReleased& e) const -> std::tuple<Model, std::optional<Command>>
+    {
+        return { std::move(m), {} };
+    }
+
+    auto operator()(Model m, const sf::Event& event) const -> std::tuple<Model, std::optional<Command>>
+    {
+        if (const auto e = event.getIf<sf::Event::KeyPressed>())
+        {
+            return (*this)(std::move(m), *e);
+        }
+        if (const auto e = event.getIf<sf::Event::KeyReleased>())
+        {
+            return (*this)(std::move(m), *e);
+        }
+        return { std::move(m), {} };
+    };
+
+    auto operator()(Model m, const TickEvent& event) const -> std::tuple<Model, std::optional<Command>>
+    {
+        m.angular_velocity += m.angular_acceleration * event.elapsed;
+        m.angular_velocity = std::min(m.angular_velocity, +m.max_angular_velocity);
+        m.angular_velocity = std::max(m.angular_velocity, -m.max_angular_velocity);
+        m.angle += m.angular_velocity * event.elapsed;
+        return { std::move(m), {} };
+    }
+
+    auto operator()(Model m, const std::variant<sf::Event, TickEvent>& event) const
+        -> std::tuple<Model, std::optional<Command>>
+    {
+        if (const auto e = std::get_if<sf::Event>(&event))
+        {
+            return (*this)(std::move(m), *e);
+        }
+        if (const auto e = std::get_if<TickEvent>(&event))
+        {
+            return (*this)(std::move(m), *e);
+        }
+        return { std::move(m), {} };
+    };
+};
+
+template <class Model>
+auto render_model(const sf::Font& font, const std::function<foo::CanvasItem(const Model&)>& func)
+    -> std::function<void(const Model&, sf::RenderWindow&)>
+{
+    return [&](const Model& m, sf::RenderWindow& window)
+    {
+        auto ctx = foo::Context{ window };
+        const auto state = foo::State{ foo::Style{}, foo::TextStyle{ font }, sf::RenderStates{} };
+        const auto scene = func(m);
+        scene(ctx, state);
+    };
+}
 
 void run()
 {
+    auto window = sf::RenderWindow(sf::VideoMode({ 1024, 768 }), "CMake SFML Project");
+    const auto desktop = sf::VideoMode::getDesktopMode();
+    window.setPosition(
+        { (int)(desktop.size.x / 2 - window.getSize().x / 2), (int)(desktop.size.y / 2 - window.getSize().y / 2) });
+
     const sf::Font arial = load_font(R"(/mnt/c/Windows/Fonts/arial.ttf)");
     const sf::Font verdana = load_font(R"(/mnt/c/Windows/Fonts/verdana.ttf)");
 
-    auto window = sf::RenderWindow{ { 1920u, 1080u }, "CMake SFML Project" };
+    using namespace ferrugo;
 
-    using namespace foo;
+    const auto frame_duration = duration_t{ 0.01F };
 
-    const auto to_view = [](const Model& m) -> CanvasItem
+    auto app = App<Model, Command>{ window, Model{ .max_angular_velocity = 1.5F } };
+    app.render = render_model<Model>(
+        arial,
+        [](const Model& m) -> foo::CanvasItem
+        {
+            return foo::group(
+                foo::group(
+                    foo::text(str("a = ", std::fixed, m.angular_acceleration)) | foo::translate({ 8, 8 + 16 * 0 }),
+                    foo::text(str("v = ", std::fixed, m.angular_velocity)) | foo::translate({ 8, 8 + 16 * 1 }))
+                    | foo::fill_color(sf::Color::Yellow),
+
+                foo::group(
+                    foo::circle(10.F) | foo::fill_color(sf::Color::Yellow) | foo::translate({ 200, 100 }),
+                    foo::circle(10.F) | foo::fill_color(sf::Color::Red) | foo::translate({ 300, 100 }),
+                    foo::circle(10.F) | foo::fill_color(sf::Color::Blue) | foo::translate({ 200, 400 }),
+                    foo::circle(10.F) | foo::fill_color(sf::Color::Green) | foo::translate({ 300, 400 }))
+                    | foo::rotate(m.angle, { 512, 384 }));
+        });
+
+    app.on_init = [](const Model& m) -> std::optional<Command> { return Command::init; };
+    app.m_update = [&](Model m, const Command& cmd) -> std::tuple<Model, std::optional<Command>>
     {
-        using namespace ferrugo;
-        return group(
-            group(
-                group(core::init(
-                    15,
-                    [](int x) -> CanvasItem
-                    {
-                        auto shape = x % 2 == 0  //
-                                         ? circle(50.F)
-                                         : rect(vec_t{ 100.F, 100.F });
-                        return shape                                   //
-                               | translate(vec_t{ 150.F * x, 500.F })  //
-                               | color(sf::Color(200, 120, 140));
-                    })),
-                group(core::repeat(circle(50.F))  //
-                          .take(3)                //
-                          .transform_indexed(
-                              [](int i, const CanvasItem& item) -> CanvasItem
-                              {
-                                  return item                              //
-                                         | translate(vec_t{ 0, 125 } * i)  //
-                                         | color(sf::Color::Red);
-                              })),
-                text("Hello")                  //
-                    | font_size(48)            //
-                    | color(sf::Color::White)  //
-                    | translate(vec_t{ 150.F, 500.F }))
-                | rotate(m.angle, vec_t{ 960.F, 540.F }),
-            text(std::to_string(m.velocity)));
+        if (cmd == Command::init)
+        {
+            std::cout << "Hello"
+                      << "\n";
+            return { m, {} };
+        }
+        if (cmd == Command::up)
+        {
+            m.angular_acceleration = +1;
+            return { m, {} };
+        }
+        if (cmd == Command::down)
+        {
+            m.angular_acceleration = -1;
+            return { m, {} };
+        }
+        if (cmd == Command::exit)
+        {
+            std::cout << "I want to exit!"
+                      << "\n";
+            window.close();
+            return { m, {} };
+        }
+        return { m, {} };
     };
 
-    using Event = std::string;
-    using Command = std::string;
-
-    auto app = App<Model, Event, Command>{ Model{ 0.F, 0.F },
-                                           View{ window, &arial },
-                                           [](const Model& m) -> std::optional<Command> { return std::nullopt; },
-                                           [](Model m, const Event& e) -> std::tuple<Model, std::optional<Command>>
-                                           {
-                                               if (e == "quit")
-                                               {
-                                                   return { m, Command{ "exit" } };
-                                               }
-                                               if (e == "left")
-                                               {
-                                                   m.velocity = 1;
-                                                   return { m, std::nullopt };
-                                               }
-                                               if (e == "right")
-                                               {
-                                                   m.velocity = -1;
-                                                   return { m, std::nullopt };
-                                               }
-                                               if (e == "tick")
-                                               {
-                                                   m.angle += m.velocity * 1.0;
-                                               }
-                                               return { m, std::nullopt };
-                                           },
-                                           [](const std::variant<sf::Event, TickEvent>& ev) -> std::optional<Event>
-                                           {
-                                               if (const auto e = std::get_if<sf::Event>(&ev))
-                                               {
-                                                   if (e->type == sf::Event::KeyPressed)
-                                                   {
-                                                       if (e->key.code == sf::Keyboard::Escape)
-                                                       {
-                                                           return Event{ "quit" };
-                                                       }
-                                                       if (e->key.code == sf::Keyboard::Left)
-                                                       {
-                                                           return Event{ "left" };
-                                                       }
-                                                       if (e->key.code == sf::Keyboard::Right)
-                                                       {
-                                                           return Event{ "right" };
-                                                       }
-                                                   }
-                                               }
-                                               if (const auto e = std::get_if<TickEvent>(&ev))
-                                               {
-                                                   return Event{ "tick" };
-                                               }
-                                               return std::nullopt;
-                                           },
-                                           to_view };
+    // auto event_handler = EventHandler<Model, Command>{};
+    app.m_handle_event = ModelEventHandler{};
 
     app.run();
 }

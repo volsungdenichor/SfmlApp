@@ -20,7 +20,7 @@ struct Style
 
 struct TextStyle
 {
-    const sf::Font* font = nullptr;
+    std::reference_wrapper<const sf::Font> font;
     unsigned int font_size = 16;
     float letter_spacing = 1.F;
     float line_spacing = 1.F;
@@ -152,7 +152,7 @@ inline auto outline_thickness(float value) -> StateModifier
 
 inline auto font(const sf::Font& value) -> StateModifier
 {
-    return modify_text_style([&](TextStyle& text_style) { text_style.font = &value; });
+    return modify_text_style([&](TextStyle& text_style) { text_style.font = value; });
 }
 
 inline auto font_size(std::uint32_t value) -> StateModifier
@@ -182,7 +182,7 @@ inline auto scale(const vec_t& v, const vec_t& pivot) -> StateModifier
 
 inline auto rotate(float a) -> StateModifier
 {
-    return modify_render_states([=](sf::RenderStates& render_states) { render_states.transform.rotate(a); });
+    return modify_render_states([=](sf::RenderStates& render_states) { render_states.transform.rotate(sf::radians(a)); });
 }
 
 inline auto rotate(float a, const vec_t& pivot) -> StateModifier
@@ -212,15 +212,10 @@ inline auto text(const sf::String& str) -> CanvasItem
 {
     return [=](Context& ctx, const State& state)
     {
-        sf::Text shape{};
-        shape.setString(str);
+        sf::Text shape{ state.text_style.font, str };
         shape.setFillColor(state.style.fill_color);
         shape.setOutlineColor(state.style.outline_color);
         shape.setOutlineThickness(state.style.outline_thickness);
-        if (state.text_style.font)
-        {
-            shape.setFont(*state.text_style.font);
-        }
         shape.setCharacterSize(state.text_style.font_size);
         shape.setLetterSpacing(state.text_style.letter_spacing);
         shape.setLineSpacing(state.text_style.line_spacing);
@@ -253,8 +248,7 @@ inline auto sprite(const sf::Texture& texture, const sf::IntRect& rect) -> Canva
 {
     return [&texture, rect](Context& ctx, const State& state)
     {
-        sf::Sprite shape{};
-        shape.setTexture(texture);
+        sf::Sprite shape{ texture };
         shape.setTextureRect(rect);
         ctx.target.draw(shape, state.render_states);
     };
