@@ -3,7 +3,9 @@
 #include <SFML/Graphics.hpp>
 #include <deque>
 #include <functional>
+#include <map>
 #include <optional>
+#include <typeindex>
 
 using fps_t = float;       // 1/s
 using duration_t = float;  // s
@@ -20,19 +22,16 @@ struct InitEvent
 template <class Model, class Msg>
 struct App
 {
-    using Event = std::variant<sf::Event, TickEvent, InitEvent>;
     using UpdateResult = std::tuple<Model, std::optional<Msg>>;
     using RenderFn = std::function<void(const Model&, sf::RenderWindow&)>;
-    using HandleEventFn = std::function<UpdateResult(const Model&, const Event&)>;
     using UpdateFn = std::function<UpdateResult(const Model&, const Msg&)>;
     using HandleMsgFn = std::function<void(sf::RenderWindow&, const Msg&)>;
 
     sf::RenderWindow& m_window;
     Model m_model_state;
     RenderFn render = {};
-    HandleEventFn m_handle_event;
-    UpdateFn m_update;
-    HandleMsgFn m_handle_msg;
+    UpdateFn update;
+    HandleMsgFn on_msg;
     std::deque<Msg> m_msg_queue;
     duration_t m_frame_duration = duration_t{ 0.01 };
 
@@ -51,7 +50,7 @@ struct App
         sf::Clock clock;
         duration_t time_since_last_update = 0.F;
 
-        handle_event(m_handle_event(m_model_state, InitEvent{}));
+        publish_event(InitEvent{});
 
         while (m_window.isOpen())
         {
@@ -70,26 +69,56 @@ struct App
                     {
                         m_window.close();
                     }
-                    handle_event(m_handle_event(m_model_state, *event));
+
+                    if (const auto e = event->getIf<sf::Event::KeyPressed>())
+                    {
+                        publish_event(*e);
+                    }
                 }
 
-                handle_event(m_handle_event(m_model_state, TickEvent{ m_frame_duration }));
+                publish_event(TickEvent{ m_frame_duration });
 
                 while (!m_msg_queue.empty())
                 {
                     Msg msg = m_msg_queue.front();
                     m_msg_queue.pop_front();
-                    if (m_handle_msg)
+                    if (on_msg)
                     {
-                        m_handle_msg(m_window, msg);
+                        on_msg(m_window, msg);
                     }
-                    handle_event(m_update(m_model_state, msg));
+                    handle_event(update(m_model_state, msg));
                 }
             }
 
             m_window.clear();
             render(m_model_state, m_window);
             m_window.display();
+        }
+    }
+
+    template <class Event>
+    using event_handler_t = std::function<UpdateResult(const Model&, const Event&)>;
+
+    using event_handler_ptr = std::function<UpdateResult(const Model&, const void*)>;
+
+    std::map<std::type_index, event_handler_ptr> m_subscriptions;
+
+    template <class Event>
+    auto subscribe(event_handler_t<Event> event_handler)
+    {
+        m_subscriptions.emplace(  //
+            std::type_index{ typeid(Event) },
+            [=](const Model& m, const void* ptr) -> UpdateResult
+            { return event_handler(m, *static_cast<const Event*>(ptr)); });
+    }
+
+    template <class Event>
+    void publish_event(const Event& event)
+    {
+        const auto [b, e] = m_subscriptions.equal_range(std::type_index{ typeid(Event) });
+        for (auto it = b; it != e; ++it)
+        {
+            handle_event(it->second(m_model_state, &event));
         }
     }
 };

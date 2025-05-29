@@ -60,76 +60,6 @@ enum class Command
     down
 };
 
-struct ModelEventHandler
-{
-    auto operator()(Model m, const sf::Event::KeyPressed& e) const -> std::tuple<Model, std::optional<Command>>
-    {
-        if (e.code == sf::Keyboard::Key::Escape)
-        {
-            return { std::move(m), Command::exit };
-        }
-        if (e.code == sf::Keyboard::Key::Up)
-        {
-            return { std::move(m), Command::up };
-        }
-        if (e.code == sf::Keyboard::Key::Down)
-        {
-            return { m, Command::down };
-        }
-        return { std::move(m), {} };
-    }
-
-    auto operator()(Model m, const sf::Event::KeyReleased& e) const -> std::tuple<Model, std::optional<Command>>
-    {
-        return { std::move(m), {} };
-    }
-
-    auto operator()(Model m, const sf::Event& event) const -> std::tuple<Model, std::optional<Command>>
-    {
-        if (const auto e = event.getIf<sf::Event::KeyPressed>())
-        {
-            return (*this)(std::move(m), *e);
-        }
-        if (const auto e = event.getIf<sf::Event::KeyReleased>())
-        {
-            return (*this)(std::move(m), *e);
-        }
-        return { std::move(m), {} };
-    };
-
-    auto operator()(Model m, const TickEvent& event) const -> std::tuple<Model, std::optional<Command>>
-    {
-        m.angular_velocity += m.angular_acceleration * event.elapsed;
-        m.angular_velocity = std::min(m.angular_velocity, +m.max_angular_velocity);
-        m.angular_velocity = std::max(m.angular_velocity, -m.max_angular_velocity);
-        m.angle += m.angular_velocity * event.elapsed;
-        return { std::move(m), {} };
-    }
-
-    auto operator()(Model m, const InitEvent& event) const -> std::tuple<Model, std::optional<Command>>
-    {
-        return { std::move(m), Command::init };
-    }
-
-    auto operator()(Model m, const std::variant<sf::Event, TickEvent, InitEvent>& event) const
-        -> std::tuple<Model, std::optional<Command>>
-    {
-        if (const auto e = std::get_if<sf::Event>(&event))
-        {
-            return (*this)(std::move(m), *e);
-        }
-        if (const auto e = std::get_if<TickEvent>(&event))
-        {
-            return (*this)(std::move(m), *e);
-        }
-        if (const auto e = std::get_if<InitEvent>(&event))
-        {
-            return (*this)(std::move(m), *e);
-        }
-        return { std::move(m), {} };
-    };
-};
-
 template <class Model>
 auto render_model(const sf::Font& font, const std::function<foo::CanvasItem(const Model&)>& func)
     -> std::function<void(const Model&, sf::RenderWindow&)>
@@ -176,17 +106,15 @@ void run()
                     | foo::rotate(m.angle, { 512, 384 }));
         });
 
-    app.m_handle_msg = [](sf::RenderWindow& w, const Command& cmd)
+    app.on_msg = [](sf::RenderWindow& w, const Command& cmd)
     {
         if (cmd == Command::exit)
         {
-            std::cout << "I want to exit!"
-                      << "\n";
             w.close();
         }
     };
 
-    app.m_update = [&](Model m, const Command& cmd) -> std::tuple<Model, std::optional<Command>>
+    app.update = [&](Model m, const Command& cmd) -> std::tuple<Model, std::optional<Command>>
     {
         if (cmd == Command::init)
         {
@@ -207,8 +135,38 @@ void run()
         return { m, {} };
     };
 
-    // auto event_handler = EventHandler<Model, Command>{};
-    app.m_handle_event = ModelEventHandler{};
+    // app.m_handle_event = ModelEventHandler{};
+    app.subscribe<InitEvent>(
+        [](Model m, const InitEvent&) -> std::tuple<Model, std::optional<Command>> {
+            return { std::move(m), Command::init };
+        });
+
+    app.subscribe<TickEvent>(
+        [](Model m, const TickEvent& event) -> std::tuple<Model, std::optional<Command>>
+        {
+            m.angular_velocity += m.angular_acceleration * event.elapsed;
+            m.angular_velocity = std::min(m.angular_velocity, +m.max_angular_velocity);
+            m.angular_velocity = std::max(m.angular_velocity, -m.max_angular_velocity);
+            m.angle += m.angular_velocity * event.elapsed;
+            return { std::move(m), {} };
+        });
+    app.subscribe<sf::Event::KeyPressed>(
+        [](Model m, const sf::Event::KeyPressed& e) -> std::tuple<Model, std::optional<Command>>
+        {
+            if (e.code == sf::Keyboard::Key::Escape)
+            {
+                return { std::move(m), Command::exit };
+            }
+            if (e.code == sf::Keyboard::Key::Up)
+            {
+                return { std::move(m), Command::up };
+            }
+            if (e.code == sf::Keyboard::Key::Down)
+            {
+                return { m, Command::down };
+            }
+            return { std::move(m), {} };
+        });
 
     app.run();
 }
