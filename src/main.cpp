@@ -135,7 +135,6 @@ void run()
         return { m, {} };
     };
 
-    // app.m_handle_event = ModelEventHandler{};
     app.subscribe<InitEvent>(
         [](Model m, const InitEvent&) -> std::tuple<Model, std::optional<Command>> {
             return { std::move(m), Command::init };

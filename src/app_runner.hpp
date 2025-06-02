@@ -45,6 +45,20 @@ struct App
         }
     }
 
+    template <class Head, class... Tail>
+    void handle_event(const sf::Event& event)
+    {
+        if (const auto e = event.getIf<Head>())
+        {
+            publish_event(*e);
+        }
+
+        if constexpr (sizeof...(Tail) > 0)
+        {
+            handle_event<Tail...>(event);
+        }
+    }
+
     void run()
     {
         sf::Clock clock;
@@ -70,10 +84,29 @@ struct App
                         m_window.close();
                     }
 
-                    if (const auto e = event->getIf<sf::Event::KeyPressed>())
-                    {
-                        publish_event(*e);
-                    }
+                    handle_event<
+                        sf::Event::Resized,
+                        sf::Event::FocusLost,
+                        sf::Event::FocusGained,
+                        sf::Event::TextEntered,
+                        sf::Event::KeyPressed,
+                        sf::Event::KeyReleased,
+                        sf::Event::MouseWheelScrolled,
+                        sf::Event::MouseButtonPressed,
+                        sf::Event::MouseButtonReleased,
+                        sf::Event::MouseMoved,
+                        sf::Event::MouseMovedRaw,
+                        sf::Event::MouseEntered,
+                        sf::Event::MouseLeft,
+                        sf::Event::JoystickButtonPressed,
+                        sf::Event::JoystickButtonReleased,
+                        sf::Event::JoystickMoved,
+                        sf::Event::JoystickConnected,
+                        sf::Event::JoystickDisconnected,
+                        sf::Event::TouchBegan,
+                        sf::Event::TouchMoved,
+                        sf::Event::TouchEnded,
+                        sf::Event::SensorChanged>(*event);
                 }
 
                 publish_event(TickEvent{ m_frame_duration });
