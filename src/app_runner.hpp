@@ -35,10 +35,15 @@ struct App
     std::deque<Msg> m_msg_queue;
     duration_t m_frame_duration = duration_t{ 0.01 };
 
-    void handle_event(UpdateResult event_result)
+    void set_model_state(Model model_state)
+    {
+        m_model_state = std::move(model_state);
+    }
+
+    void handle_update_result(UpdateResult event_result)
     {
         auto [new_model_state, maybe_msg] = std::move(event_result);
-        m_model_state = std::move(new_model_state);
+        set_model_state(std::move(new_model_state));
         if (maybe_msg)
         {
             m_msg_queue.push_back(*maybe_msg);
@@ -119,7 +124,7 @@ struct App
                     {
                         on_msg(m_window, msg);
                     }
-                    handle_event(update(m_model_state, msg));
+                    handle_update_result(update(m_model_state, msg));
                 }
             }
 
@@ -151,7 +156,7 @@ struct App
         const auto [b, e] = m_subscriptions.equal_range(std::type_index{ typeid(Event) });
         for (auto it = b; it != e; ++it)
         {
-            handle_event(it->second(m_model_state, &event));
+            handle_update_result(it->second(m_model_state, static_cast<const void*>(&event)));
         }
     }
 };
