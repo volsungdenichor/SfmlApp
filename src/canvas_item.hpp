@@ -208,6 +208,32 @@ auto group(CanvasItem head, Tail... tail) -> CanvasItem
     return group(std::move(items));
 }
 
+template <class Func, class Range>
+auto transform(Func&& func, Range&& range) -> CanvasItem
+{
+    std::vector<CanvasItem> items;
+    for (const auto& item : range)
+    {
+        items.push_back(std::invoke(func, item));
+    }
+    return group(std::move(items));
+}
+
+template <class Func, class Range>
+auto transform_maybe(Func&& func, Range&& range) -> CanvasItem
+{
+    std::vector<CanvasItem> items;
+    for (const auto& item : range)
+    {
+        std::optional<CanvasItem> res = std::invoke(func, item);
+        if (res)
+        {
+            items.push_back(*std::move(res));
+        }
+    }
+    return group(std::move(items));
+}
+
 inline auto text(const sf::String& str) -> CanvasItem
 {
     return [=](Context& ctx, const State& state)

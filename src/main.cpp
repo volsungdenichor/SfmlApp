@@ -44,21 +44,57 @@ inline auto load_font(const std::string& path) -> sf::Font
     return result;
 }
 
+struct Boid
+{
+    struct Linear
+    {
+        vec_t location = {};
+        vec_t velocity = {};
+        vec_t accelarion = {};
+    };
+    struct Angular
+    {
+        float location = 0.F;
+        float velocity = 0;
+        float acceleration = 0;
+    };
+
+    Linear linear;
+    Angular angular;
+};
+
 struct Model
 {
-    int angular_acceleration = 0;
-    float angular_velocity = 0;
-    float angle = 0.F;
+    std::vector<Boid> boids;
     float max_angular_velocity;
 };
 
-enum class Command
+namespace Commands
 {
-    init,
-    exit,
-    up,
-    down
+
+struct Init
+{
 };
+struct Exit
+{
+};
+struct Accelerate
+{
+    float value;
+};
+
+struct AddBoid
+{
+    vec_t pos;
+};
+
+}  // namespace Commands
+
+using Command = std::variant<  //
+    Commands::Init,
+    Commands::Exit,
+    Commands::Accelerate,
+    Commands::AddBoid>;
 
 template <class Model>
 auto render_model(const sf::Font& font, const std::function<foo::CanvasItem(const Model&)>& func)
@@ -73,108 +109,241 @@ auto render_model(const sf::Font& font, const std::function<foo::CanvasItem(cons
     };
 }
 
-void run()
+namespace detail
 {
-    auto window = sf::RenderWindow(sf::VideoMode({ 1024, 768 }), "CMake SFML Project");
-    const auto desktop = sf::VideoMode::getDesktopMode();
-    window.setPosition(
-        { (int)(desktop.size.x / 2 - window.getSize().x / 2), (int)(desktop.size.y / 2 - window.getSize().y / 2) });
 
-    const sf::Font arial = load_font(R"(/mnt/c/Windows/Fonts/arial.ttf)");
-    const sf::Font verdana = load_font(R"(/mnt/c/Windows/Fonts/verdana.ttf)");
+struct apply_fn
+{
+    template <class Func>
+    struct impl_t
+    {
+        Func m_func;
+
+        template <class T>
+        auto operator()(T& item) const -> T&
+        {
+            std::invoke(m_func, item);
+            return item;
+        }
+
+        template <class T>
+        friend auto operator|(T& item, const impl_t& impl) -> T&
+        {
+            return impl(std::move(item));
+        }
+    };
+
+    template <class Func>
+    auto operator()(Func&& func) const -> impl_t<std::decay_t<Func>>
+    {
+        return { std::forward<Func>(func) };
+    }
+};
+struct with_fn
+{
+    template <class Func>
+    struct impl_t
+    {
+        Func m_func;
+
+        template <class T>
+        auto operator()(T item) const -> T
+        {
+            std::invoke(m_func, item);
+            return item;
+        }
+
+        template <class T>
+        friend auto operator|(T item, const impl_t& impl) -> T
+        {
+            return impl(std::move(item));
+        }
+    };
+
+    template <class Func>
+    auto operator()(Func&& func) const -> impl_t<std::decay_t<Func>>
+    {
+        return { std::forward<Func>(func) };
+    }
+};
+
+}  // namespace detail
+
+static constexpr auto apply = detail::apply_fn{};
+static constexpr auto with = detail::with_fn{};
+
+template <class T>
+constexpr auto create(std::function<void(T&)> func) -> T
+{
+    return T{} | with(std::move(func));
+}
+
+auto get_center(sf::Vector2u desktop_size, sf::Vector2u window_size) -> sf::Vector2i
+{
+    return { (int)(desktop_size.x / 2 - window_size.x / 2), (int)(desktop_size.y / 2 - window_size.y / 2) };
+}
+
+constexpr auto model_to_canvas_item = [](const Model& m) -> foo::CanvasItem
+{
+    return foo::group(
+        foo::text(str("n = ", std::fixed, m.boids.size()))  //
+            | foo::translate({ 8, 8 + 16 * 0 })             //
+            | foo::fill_color(sf::Color::Red)               //
+            | foo::outline_color(sf::Color::Red)            //
+            | foo::font_size(16),
+        foo::transform(
+            [](const Boid& b) -> foo::CanvasItem
+            {
+                const auto size = vec_t{ 20.F, 30.F };
+                return foo::rect(size)                       //
+                       | foo::fill_color(sf::Color::Yellow)  //
+                       | foo::translate(-size / 2)           //
+                       | foo::rotate(b.angular.location)     //
+                       | foo::translate(b.linear.location);
+            },
+            m.boids));
+};
+
+constexpr auto update = [](Model m, const Command& cmd) -> std::tuple<Model, std::optional<Command>>
+{
+    if (const auto c = std::get_if<Commands::Exit>(&cmd))
+    {
+        std::cout << "Bye!"
+                  << "\n";
+        return { m, {} };
+    }
+    if (const auto c = std::get_if<Commands::Accelerate>(&cmd))
+    {
+        for (auto& b : m.boids)
+        {
+            b.angular.acceleration = c->value;
+        }
+        return { m, {} };
+    }
+    if (const auto c = std::get_if<Commands::AddBoid>(&cmd))
+    {
+        m.boids.push_back(create<Boid>(
+            [&](Boid& b)
+            {
+                b.linear.location = c->pos;
+                b.angular.acceleration = 0.1F;
+            }));
+        return { m, {} };
+    }
+    return { m, {} };
+};
+
+constexpr auto on_tick = [](Model m, const TickEvent& event) -> std::tuple<Model, std::optional<Command>>
+{
+    for (auto& b : m.boids)
+    {
+        b.linear.velocity += b.linear.accelarion * event.elapsed;
+        b.linear.location += b.linear.velocity * event.elapsed;
+
+        b.angular.velocity += b.angular.acceleration * event.elapsed;
+        b.angular.velocity = std::min(b.angular.velocity, +m.max_angular_velocity);
+        b.angular.velocity = std::max(b.angular.velocity, -m.max_angular_velocity);
+        b.angular.location += b.angular.velocity * event.elapsed;
+    }
+    return { std::move(m), {} };
+};
+
+constexpr auto on_key_pressed = [](Model m, const sf::Event::KeyPressed& e) -> std::tuple<Model, std::optional<Command>>
+{
+    static const auto commands = std::map<sf::Keyboard::Key, Command>{
+        { sf::Keyboard::Key::Escape, Commands::Exit{} },
+        { sf::Keyboard::Key::Q, Commands::Exit{} },
+        { sf::Keyboard::Key::Up, Commands::Accelerate{ +1.F } },
+        { sf::Keyboard::Key::Down, Commands::Accelerate{ -1.F } },
+    };
+    if (const auto commmand = commands.find(e.code); commmand != commands.end())
+    {
+        return { std::move(m), commmand->second };
+    }
+    return { std::move(m), {} };
+};
+
+constexpr auto on_mouse_buttton_pressed
+    = [](Model m, const sf::Event::MouseButtonPressed& e) -> std::tuple<Model, std::optional<Command>>
+{
+    if (e.button == sf::Mouse::Button::Left)
+    {
+        return { std::move(m), Commands::AddBoid{ convert(e.position) } };
+    }
+    return { std::move(m), {} };
+};
+
+void run(const std::vector<std::string_view> args)
+{
+    static const std::string fonts_dir = R"(/mnt/c/Windows/Fonts/)";
+
+    auto window = sf::RenderWindow(sf::VideoMode({ 1024, 768 }), "CMake SFML Project");
+    const auto desktop_size = sf::VideoMode::getDesktopMode().size;
+    window.setPosition(get_center(sf::VideoMode::getDesktopMode().size, window.getSize()));
+
+    const sf::Font arial = load_font(fonts_dir + "arial.ttf");
 
     using namespace ferrugo;
 
     const auto frame_duration = duration_t{ 0.01F };
 
-    auto app = App<Model, Command>{ window, Model{ .max_angular_velocity = 1.5F } };
-    app.render = render_model<Model>(
-        arial,
-        [](const Model& m) -> foo::CanvasItem
-        {
-            return foo::group(
-                foo::group(
-                    foo::text(str("a = ", std::fixed, m.angular_acceleration)) | foo::translate({ 8, 8 + 16 * 0 }),
-                    foo::text(str("v = ", std::fixed, m.angular_velocity)) | foo::translate({ 8, 8 + 16 * 1 }))
-                    | foo::fill_color(sf::Color::Yellow),
+    auto boids = std::vector<Boid>{ create<Boid>(
+                                        [](Boid& b)
+                                        {
+                                            b.angular.velocity = 1.0F;
+                                            b.linear.location = { 300, 300 };
+                                        }),
+                                    create<Boid>(
+                                        [](Boid& b)
+                                        {
+                                            b.angular.velocity = -1.0F;
+                                            b.linear.location = { 500, 100 };
+                                            b.linear.accelarion = { -1.F, 0.5F };
+                                        }),
+                                    create<Boid>(
+                                        [](Boid& b)
+                                        {
+                                            b.angular.velocity = 2.0F;
+                                            b.linear.location = { 400, 200 };
+                                        }) };
 
-                foo::group(
-                    foo::circle(10.F) | foo::fill_color(sf::Color::Yellow) | foo::translate({ 200, 100 }),
-                    foo::circle(10.F) | foo::fill_color(sf::Color::Red) | foo::translate({ 300, 100 }),
-                    foo::circle(10.F) | foo::fill_color(sf::Color::Blue) | foo::translate({ 200, 400 }),
-                    foo::circle(10.F) | foo::fill_color(sf::Color::Green) | foo::translate({ 300, 400 }))
-                    | foo::rotate(m.angle, { 512, 384 }));
-        });
+    auto model = Model{ .boids = std::move(boids), .max_angular_velocity = 1.5F };
+
+    auto app = App<Model, Command>{ window, std::move(model) };
+    app.render = render_model<Model>(arial, model_to_canvas_item);
 
     app.on_msg = [](sf::RenderWindow& w, const Command& cmd)
     {
-        if (cmd == Command::exit)
+        if (const auto c = std::get_if<Commands::Exit>(&cmd))
         {
             w.close();
         }
     };
 
-    app.update = [&](Model m, const Command& cmd) -> std::tuple<Model, std::optional<Command>>
-    {
-        if (cmd == Command::init)
-        {
-            std::cout << "Hello"
-                      << "\n";
-            return { m, {} };
-        }
-        if (cmd == Command::up)
-        {
-            m.angular_acceleration = +1;
-            return { m, {} };
-        }
-        if (cmd == Command::down)
-        {
-            m.angular_acceleration = -1;
-            return { m, {} };
-        }
-        return { m, {} };
-    };
+    app.update = update;
 
     app.subscribe<InitEvent>(
         [](Model m, const InitEvent&) -> std::tuple<Model, std::optional<Command>> {
-            return { std::move(m), Command::init };
+            return { std::move(m), Commands::Init{} };
         });
 
-    app.subscribe<TickEvent>(
-        [](Model m, const TickEvent& event) -> std::tuple<Model, std::optional<Command>>
-        {
-            m.angular_velocity += m.angular_acceleration * event.elapsed;
-            m.angular_velocity = std::min(m.angular_velocity, +m.max_angular_velocity);
-            m.angular_velocity = std::max(m.angular_velocity, -m.max_angular_velocity);
-            m.angle += m.angular_velocity * event.elapsed;
-            return { std::move(m), {} };
-        });
-    app.subscribe<sf::Event::KeyPressed>(
-        [](Model m, const sf::Event::KeyPressed& e) -> std::tuple<Model, std::optional<Command>>
-        {
-            if (e.code == sf::Keyboard::Key::Escape)
-            {
-                return { std::move(m), Command::exit };
-            }
-            if (e.code == sf::Keyboard::Key::Up)
-            {
-                return { std::move(m), Command::up };
-            }
-            if (e.code == sf::Keyboard::Key::Down)
-            {
-                return { m, Command::down };
-            }
-            return { std::move(m), {} };
-        });
+    app.subscribe<TickEvent>(on_tick);
+    app.subscribe<sf::Event::KeyPressed>(on_key_pressed);
+    app.subscribe<sf::Event::MouseButtonPressed>(on_mouse_buttton_pressed);
 
     app.run();
 }
 
-int main()
+int main(int argc, char* argv[])
 {
     try
     {
-        run();
+        std::vector<std::string_view> args;
+        for (int n = 0; n < argc; ++n)
+        {
+            args.push_back(argv[n]);
+        }
+        run(args);
     }
     catch (const std::exception& e)
     {
