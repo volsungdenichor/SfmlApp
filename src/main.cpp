@@ -9,11 +9,11 @@
 #include <iostream>
 #include <memory>
 #include <sstream>
+#include <variant>
 
 #include "animation.hpp"
 #include "app_runner.hpp"
 #include "canvas_item.hpp"
-// #include "event_handler.hpp"
 #include "vec_t.hpp"
 
 template <class... Args>
@@ -65,7 +65,10 @@ struct Boid
 
 struct Model
 {
+    anim::time_point_t time_point;
     std::vector<Boid> boids;
+    anim::animation<float> runner_animation = anim::constant(0.F, 100.F);
+    vec_t runner;
     float max_angular_velocity;
 };
 
@@ -98,9 +101,9 @@ using Command = std::variant<  //
 
 template <class Model>
 auto render_model(const sf::Font& font, const std::function<foo::CanvasItem(const Model&)>& func)
-    -> std::function<void(const Model&, sf::RenderWindow&)>
+    -> std::function<void(sf::RenderWindow&, const Model&)>
 {
-    return [&](const Model& m, sf::RenderWindow& window)
+    return [&](sf::RenderWindow& window, const Model& m)
     {
         auto ctx = foo::Context{ window };
         const auto state = foo::State{ foo::Style{}, foo::TextStyle{ font }, sf::RenderStates{} };
@@ -191,6 +194,11 @@ constexpr auto model_to_canvas_item = [](const Model& m) -> foo::CanvasItem
             | foo::fill_color(sf::Color::Red)               //
             | foo::outline_color(sf::Color::Red)            //
             | foo::font_size(16),
+        foo::text(str("t = ", std::fixed, m.time_point, "s"))  //
+            | foo::translate({ 8, 8 + 16 * 1 })                //
+            | foo::fill_color(sf::Color::White)                //
+            | foo::outline_color(sf::Color::White)             //
+            | foo::font_size(16),
         foo::transform(
             [](const Boid& b) -> foo::CanvasItem
             {
@@ -201,7 +209,8 @@ constexpr auto model_to_canvas_item = [](const Model& m) -> foo::CanvasItem
                        | foo::rotate(b.angular.location)     //
                        | foo::translate(b.linear.location);
             },
-            m.boids));
+            m.boids),
+        foo::circle(16.F) | foo::translate(m.runner) | foo::fill_color(sf::Color::Green));
 };
 
 constexpr auto update = [](Model m, const Command& cmd) -> std::tuple<Model, std::optional<Command>>
@@ -226,7 +235,7 @@ constexpr auto update = [](Model m, const Command& cmd) -> std::tuple<Model, std
             [&](Boid& b)
             {
                 b.linear.location = c->pos;
-                b.angular.acceleration = 0.1F;
+                b.angular.acceleration = 0.25F;
             }));
         return { m, {} };
     }
@@ -245,6 +254,8 @@ constexpr auto on_tick = [](Model m, const TickEvent& event) -> std::tuple<Model
         b.angular.velocity = std::max(b.angular.velocity, -m.max_angular_velocity);
         b.angular.location += b.angular.velocity * event.elapsed;
     }
+    m.time_point += event.elapsed;
+    m.runner = vec_t{ m.runner_animation(m.time_point), 200 };
     return { std::move(m), {} };
 };
 
@@ -273,6 +284,34 @@ constexpr auto on_mouse_buttton_pressed
     return { std::move(m), {} };
 };
 
+Model create_model()
+{
+    Model m{};
+    m.time_point = anim::time_point_t{ 0.F };
+    m.boids = { create<Boid>(
+                    [](Boid& b)
+                    {
+                        b.angular.velocity = 1.0F;
+                        b.linear.location = { 300, 300 };
+                    }),
+                create<Boid>(
+                    [](Boid& b)
+                    {
+                        b.angular.velocity = -1.0F;
+                        b.linear.location = { 500, 100 };
+                        b.linear.accelarion = { -1.F, 0.5F };
+                    }),
+                create<Boid>(
+                    [](Boid& b)
+                    {
+                        b.angular.velocity = 2.0F;
+                        b.linear.location = { 400, 200 };
+                    }) };
+    m.max_angular_velocity = 1.5F;
+    m.runner_animation = anim::ping_pong(anim::gradual(0.F, 500.F, anim::duration_t{ 1 }, anim::ease::quad_in_out), 10.0F);
+    return m;
+}
+
 void run(const std::vector<std::string_view> args)
 {
     static const std::string fonts_dir = R"(/mnt/c/Windows/Fonts/)";
@@ -285,33 +324,10 @@ void run(const std::vector<std::string_view> args)
 
     using namespace ferrugo;
 
-    const auto frame_duration = duration_t{ 0.01F };
+    auto app = App<Model, Command>{ window, create_model() };
+    app.frame_duration = duration_t{ 0.01F };
 
-    auto boids = std::vector<Boid>{ create<Boid>(
-                                        [](Boid& b)
-                                        {
-                                            b.angular.velocity = 1.0F;
-                                            b.linear.location = { 300, 300 };
-                                        }),
-                                    create<Boid>(
-                                        [](Boid& b)
-                                        {
-                                            b.angular.velocity = -1.0F;
-                                            b.linear.location = { 500, 100 };
-                                            b.linear.accelarion = { -1.F, 0.5F };
-                                        }),
-                                    create<Boid>(
-                                        [](Boid& b)
-                                        {
-                                            b.angular.velocity = 2.0F;
-                                            b.linear.location = { 400, 200 };
-                                        }) };
-
-    auto model = Model{ .boids = std::move(boids), .max_angular_velocity = 1.5F };
-
-    auto app = App<Model, Command>{ window, std::move(model) };
     app.render = render_model<Model>(arial, model_to_canvas_item);
-
     app.on_msg = [](sf::RenderWindow& w, const Command& cmd)
     {
         if (const auto c = std::get_if<Commands::Exit>(&cmd))
@@ -338,12 +354,7 @@ int main(int argc, char* argv[])
 {
     try
     {
-        std::vector<std::string_view> args;
-        for (int n = 0; n < argc; ++n)
-        {
-            args.push_back(argv[n]);
-        }
-        run(args);
+        run(std::vector<std::string_view>(argv, argv + argc));
     }
     catch (const std::exception& e)
     {

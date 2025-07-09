@@ -11,7 +11,7 @@ namespace anim
 using time_point_t = float;
 using duration_t = float;
 
-using ease_function = std::function<float(float)>;
+using ease_fn = std::function<float(time_point_t)>;
 
 inline time_point_t wrap(time_point_t time, duration_t duration, time_point_t inflection_point = {})
 {
@@ -86,6 +86,9 @@ struct animation
         return m_impl->wrapped_value(t, inflection_point);
     }
 };
+
+namespace detail
+{
 
 struct reverse_fn
 {
@@ -362,7 +365,7 @@ struct gradual_fn
     class impl : public animation_impl<T>
     {
     public:
-        impl(duration_t duration, T start_value, T end_value, ease_function ease)
+        impl(duration_t duration, T start_value, T end_value, ease_fn ease)
             : m_duration(duration)
             , m_start_value(start_value)
             , m_end_value(end_value)
@@ -394,11 +397,11 @@ struct gradual_fn
         duration_t m_duration;
         T m_start_value;
         T m_end_value;
-        ease_function m_ease;
+        ease_fn m_ease;
     };
 
     template <class T>
-    auto operator()(T start_value, T end_value, duration_t duration, ease_function ease) const -> animation<T>
+    auto operator()(T start_value, T end_value, duration_t duration, ease_fn ease) const -> animation<T>
     {
         return animation<T>(std::make_shared<impl<T>>(duration, start_value, end_value, std::move(ease)));
     }
@@ -483,13 +486,15 @@ struct sequence_fn
     }
 };
 
-static constexpr inline auto reverse = reverse_fn{};
-static constexpr inline auto repeat = repeat_fn{};
-static constexpr inline auto ping_pong = ping_pong_fn{};
-static constexpr inline auto constant = constant_fn{};
-static constexpr inline auto gradual = gradual_fn{};
-static constexpr inline auto slice = slice_fn{};
-static constexpr inline auto rescale = rescale_fn{};
-static constexpr inline auto sequence = sequence_fn{};
+}  // namespace detail
+
+static constexpr inline auto reverse = detail::reverse_fn{};
+static constexpr inline auto repeat = detail::repeat_fn{};
+static constexpr inline auto ping_pong = detail::ping_pong_fn{};
+static constexpr inline auto constant = detail::constant_fn{};
+static constexpr inline auto gradual = detail::gradual_fn{};
+static constexpr inline auto slice = detail::slice_fn{};
+static constexpr inline auto rescale = detail::rescale_fn{};
+static constexpr inline auto sequence = detail::sequence_fn{};
 
 }  // namespace anim

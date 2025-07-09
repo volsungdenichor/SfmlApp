@@ -23,17 +23,23 @@ template <class Model, class Msg>
 struct App
 {
     using UpdateResult = std::tuple<Model, std::optional<Msg>>;
-    using RenderFn = std::function<void(const Model&, sf::RenderWindow&)>;
-    using UpdateFn = std::function<UpdateResult(const Model&, const Msg&)>;
+    template <class Event>
+    using EventHandler = std::function<UpdateResult(const Model&, const Event&)>;
+
+    using RenderFn = std::function<void(sf::RenderWindow&, const Model&)>;
+    using UpdateFn = EventHandler<Msg>;
     using HandleMsgFn = std::function<void(sf::RenderWindow&, const Msg&)>;
+
+    using TypeErasedEventHandler = std::function<UpdateResult(const Model&, const void*)>;
 
     sf::RenderWindow& m_window;
     Model m_model_state;
     RenderFn render = {};
-    UpdateFn update;
-    HandleMsgFn on_msg;
-    std::deque<Msg> m_msg_queue;
-    duration_t m_frame_duration = duration_t{ 0.01 };
+    UpdateFn update = {};
+    HandleMsgFn on_msg = {};
+    std::deque<Msg> m_msg_queue = {};
+    std::map<std::type_index, TypeErasedEventHandler> m_subscriptions = {};
+    duration_t frame_duration = duration_t{ 0.01 };
 
     void set_model_state(Model model_state)
     {
@@ -78,9 +84,9 @@ struct App
 
             const fps_t fps = 1.0F / elapsed;
 
-            while (time_since_last_update > m_frame_duration)
+            while (time_since_last_update > frame_duration)
             {
-                time_since_last_update -= m_frame_duration;
+                time_since_last_update -= frame_duration;
 
                 while (const std::optional<sf::Event> event = m_window.pollEvent())
                 {
@@ -114,7 +120,7 @@ struct App
                         sf::Event::SensorChanged>(*event);
                 }
 
-                publish_event(TickEvent{ m_frame_duration });
+                publish_event(TickEvent{ frame_duration });
 
                 while (!m_msg_queue.empty())
                 {
@@ -129,20 +135,13 @@ struct App
             }
 
             m_window.clear();
-            render(m_model_state, m_window);
+            render(m_window, m_model_state);
             m_window.display();
         }
     }
 
     template <class Event>
-    using event_handler_t = std::function<UpdateResult(const Model&, const Event&)>;
-
-    using event_handler_ptr = std::function<UpdateResult(const Model&, const void*)>;
-
-    std::map<std::type_index, event_handler_ptr> m_subscriptions;
-
-    template <class Event>
-    auto subscribe(event_handler_t<Event> event_handler)
+    auto subscribe(EventHandler<Event> event_handler)
     {
         m_subscriptions.emplace(  //
             std::type_index{ typeid(Event) },
