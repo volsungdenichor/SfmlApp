@@ -63,12 +63,18 @@ struct Boid
     Angular angular;
 };
 
+struct Point
+{
+    vec_t pos;
+    float y;
+    anim::animation<float> animation = anim::constant(0.F, 100.F);
+};
+
 struct Model
 {
     anim::time_point_t time_point;
     std::vector<Boid> boids;
-    anim::animation<float> runner_animation = anim::constant(0.F, 100.F);
-    vec_t runner;
+    std::vector<Point> points;
     float max_angular_velocity;
 };
 
@@ -210,7 +216,10 @@ constexpr auto model_to_canvas_item = [](const Model& m) -> foo::CanvasItem
                        | foo::translate(b.linear.location);
             },
             m.boids),
-        foo::circle(16.F) | foo::translate(m.runner) | foo::fill_color(sf::Color::Green));
+        foo::transform(
+            [](const Point& p) -> foo::CanvasItem
+            { return foo::circle(15.F) | foo::translate(p.pos) | foo::fill_color(sf::Color::Green); },
+            m.points));
 };
 
 constexpr auto update = [](Model m, const Command& cmd) -> std::tuple<Model, std::optional<Command>>
@@ -255,7 +264,10 @@ constexpr auto on_tick = [](Model m, const TickEvent& event) -> std::tuple<Model
         b.angular.location += b.angular.velocity * event.elapsed;
     }
     m.time_point += event.elapsed;
-    m.runner = vec_t{ m.runner_animation(m.time_point), 200 };
+    for (auto& p : m.points)
+    {
+        p.pos = vec_t{ p.animation(m.time_point), p.y };
+    }
     return { std::move(m), {} };
 };
 
@@ -287,6 +299,7 @@ constexpr auto on_mouse_buttton_pressed
 Model create_model()
 {
     Model m{};
+    m.max_angular_velocity = 1.5F;
     m.time_point = anim::time_point_t{ 0.F };
     m.boids = { create<Boid>(
                     [](Boid& b)
@@ -307,8 +320,61 @@ Model create_model()
                         b.angular.velocity = 2.0F;
                         b.linear.location = { 400, 200 };
                     }) };
-    m.max_angular_velocity = 1.5F;
-    m.runner_animation = anim::ping_pong(anim::gradual(0.F, 500.F, anim::duration_t{ 1 }, anim::ease::quad_in_out), 10.0F);
+    m.points = {
+        create<Point>(
+            [](Point& p)
+            {
+                p.animation = anim::ping_pong(anim::gradual(0.F, 500.F, anim::duration_t{ 1 }, anim::ease::none), 10.0F);
+                p.y = 50;
+            }),
+        create<Point>(
+            [](Point& p)
+            {
+                p.animation
+                    = anim::ping_pong(anim::gradual(0.F, 500.F, anim::duration_t{ 1 }, anim::ease::quad_in_out), 10.0F);
+                p.y = 100;
+            }),
+        create<Point>(
+            [](Point& p)
+            {
+                p.animation = anim::ping_pong(anim::gradual(0.F, 500.F, anim::duration_t{ 1 }, anim::ease::quad_in), 10.0F);
+                p.y = 150;
+            }),
+        create<Point>(
+            [](Point& p)
+            {
+                p.animation = anim::ping_pong(anim::gradual(0.F, 500.F, anim::duration_t{ 1 }, anim::ease::quad_out), 10.0F);
+                p.y = 200;
+            }),
+        create<Point>(
+            [](Point& p)
+            {
+                p.animation
+                    = anim::ping_pong(anim::gradual(0.F, 500.F, anim::duration_t{ 1 }, anim::ease::cubic_in_out), 10.0F);
+                p.y = 300;
+            }),
+        create<Point>(
+            [](Point& p)
+            {
+                p.animation = anim::ping_pong(anim::gradual(0.F, 500.F, anim::duration_t{ 1 }, anim::ease::cubic_in), 10.0F);
+                p.y = 350;
+            }),
+        create<Point>(
+            [](Point& p)
+            {
+                p.animation
+                    = anim::ping_pong(anim::gradual(0.F, 500.F, anim::duration_t{ 1 }, anim::ease::cubic_out), 10.0F);
+                p.y = 400;
+            }),
+        create<Point>(
+            [](Point& p)
+            {
+                p.animation
+                    = anim::ping_pong(anim::gradual(0.F, 500.F, anim::duration_t{ 1 }, anim::ease::circ_in_out), 10.0F);
+                p.y = 500;
+            })
+
+    };
     return m;
 }
 
