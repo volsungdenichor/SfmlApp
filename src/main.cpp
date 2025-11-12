@@ -77,6 +77,7 @@ struct Model
     std::vector<Boid> boids;
     std::vector<Point> points;
     float max_angular_velocity;
+    bool show_info = false;
 };
 
 namespace Commands
@@ -98,18 +99,23 @@ struct AddBoid
     vec_t pos;
 };
 
+struct ToggleInfo
+{
+};
+
 }  // namespace Commands
 
 using Command = std::variant<  //
     Commands::Init,
     Commands::Exit,
     Commands::Accelerate,
-    Commands::AddBoid>;
+    Commands::AddBoid,
+    Commands::ToggleInfo>;
 
 template <class Model>
 auto render_model(const sf::Font& font, const std::function<foo::CanvasItem(const Model&, fps_t)>& func) -> RendererFn<Model>
 {
-    return [&](sf::RenderWindow& window, const Model& m, fps_t fps)
+    return [=](sf::RenderWindow& window, const Model& m, fps_t fps)
     {
         auto ctx = foo::Context{ window };
         const auto state = foo::State{ foo::Style{}, foo::TextStyle{ font }, sf::RenderStates{} };
@@ -128,9 +134,9 @@ auto create_model() -> Model
     Model m{};
     m.max_angular_velocity = 1.5F;
     m.time_point = anim::time_point_t{ 0.F };
-    for (int y = 100; y < 600; y += 15)
+    for (int y = 100; y < 700; y += 15)
     {
-        for (int x = 100; x < 800; x += 15)
+        for (int x = 100; x < 900; x += 15)
         {
             m.boids.push_back(create<Boid>(
                 [&](Boid& b)
@@ -206,7 +212,7 @@ void run(const std::vector<std::string_view> args)
     const auto desktop_size = sf::VideoMode::getDesktopMode().size;
     window.setPosition(get_center(sf::VideoMode::getDesktopMode().size, window.getSize()));
 
-    const sf::Font arial = load_font(fonts_dir + "arial.ttf");
+    const sf::Font font = load_font(fonts_dir + "arial.ttf");
 
     using namespace ferrugo;
 
@@ -214,29 +220,30 @@ void run(const std::vector<std::string_view> args)
     app.frame_duration = duration_t{ 0.01F };
 
     app.render = render_model<Model>(
-        arial,
+        font,
         [](const Model& m, fps_t fps) -> foo::CanvasItem
         {
+            const auto info = foo::text(
+                                  str("n = ",
+                                      std::fixed,
+                                      m.boids.size(),
+                                      "\nt = ",
+                                      std::fixed,
+                                      m.time_point,
+                                      "s\nfps = ",
+                                      std::fixed,
+                                      fps))                                 //
+                              | foo::translate({ 8, 8 })                    //
+                              | foo::fill_color(sf::Color::Red)             //
+                              | foo::outline_color(sf::Color::Transparent)  //
+                              | foo::outline_thickness(1.F)                 //
+                              | foo::font_size(12);
             return foo::group(
-                foo::text(str("n = ", std::fixed, m.boids.size()))  //
-                    | foo::translate({ 8, 8 + 16 * 0 })             //
-                    | foo::fill_color(sf::Color::Red)               //
-                    | foo::outline_color(sf::Color::Red)            //
-                    | foo::font_size(16),
-                foo::text(str("t = ", std::fixed, m.time_point, "s"))  //
-                    | foo::translate({ 8, 8 + 16 * 1 })                //
-                    | foo::fill_color(sf::Color::White)                //
-                    | foo::outline_color(sf::Color::White)             //
-                    | foo::font_size(16),
-                foo::text(str("fps = ", std::fixed, fps))   //
-                    | foo::translate({ 8, 8 + 16 * 2 })     //
-                    | foo::fill_color(sf::Color::White)     //
-                    | foo::outline_color(sf::Color::White)  //
-                    | foo::font_size(16),
+                m.show_info ? info : foo::CanvasItem{ [](foo::Context&, const foo::State&) {} },
                 foo::transform(
                     [](const Boid& b) -> foo::CanvasItem
                     {
-                        const auto size = vec_t{ 10.F, 15.F };
+                        const auto size = vec_t{ 5.F, 7.F };
                         return foo::rect(size)                       //
                                | foo::fill_color(sf::Color::Yellow)  //
                                | foo::translate(-size / 2)           //
@@ -287,6 +294,11 @@ void run(const std::vector<std::string_view> args)
         {
             return {};
         }
+        else if (const auto c = std::get_if<Commands::ToggleInfo>(&cmd))
+        {
+            m.show_info = !m.show_info;
+            return {};
+        }
         return {};
     };
 
@@ -320,6 +332,7 @@ void run(const std::vector<std::string_view> args)
                 { sf::Keyboard::Key::Q, Commands::Exit{} },
                 { sf::Keyboard::Key::Up, Commands::Accelerate{ +1.F } },
                 { sf::Keyboard::Key::Down, Commands::Accelerate{ -1.F } },
+                { sf::Keyboard::Key::F, Commands::ToggleInfo{} },
             };
             if (const auto commmand = commands.find(e.code); commmand != commands.end())
             {
