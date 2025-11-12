@@ -14,6 +14,7 @@
 #include "animation.hpp"
 #include "app_runner.hpp"
 #include "canvas_item.hpp"
+#include "functional.hpp"
 #include "vec_t.hpp"
 
 template <class... Args>
@@ -106,85 +107,15 @@ using Command = std::variant<  //
     Commands::AddBoid>;
 
 template <class Model>
-auto render_model(const sf::Font& font, const std::function<foo::CanvasItem(const Model&)>& func)
-    -> std::function<void(sf::RenderWindow&, const Model&)>
+auto render_model(const sf::Font& font, const std::function<foo::CanvasItem(const Model&, fps_t)>& func) -> RendererFn<Model>
 {
-    return [&](sf::RenderWindow& window, const Model& m)
+    return [&](sf::RenderWindow& window, const Model& m, fps_t fps)
     {
         auto ctx = foo::Context{ window };
         const auto state = foo::State{ foo::Style{}, foo::TextStyle{ font }, sf::RenderStates{} };
-        const auto scene = func(m);
+        const auto scene = func(m, fps);
         scene(ctx, state);
     };
-}
-
-namespace detail
-{
-
-struct apply_fn
-{
-    template <class Func>
-    struct impl_t
-    {
-        Func m_func;
-
-        template <class T>
-        auto operator()(T& item) const -> T&
-        {
-            std::invoke(m_func, item);
-            return item;
-        }
-
-        template <class T>
-        friend auto operator|(T& item, const impl_t& impl) -> T&
-        {
-            return impl(std::move(item));
-        }
-    };
-
-    template <class Func>
-    auto operator()(Func&& func) const -> impl_t<std::decay_t<Func>>
-    {
-        return { std::forward<Func>(func) };
-    }
-};
-struct with_fn
-{
-    template <class Func>
-    struct impl_t
-    {
-        Func m_func;
-
-        template <class T>
-        auto operator()(T item) const -> T
-        {
-            std::invoke(m_func, item);
-            return item;
-        }
-
-        template <class T>
-        friend auto operator|(T item, const impl_t& impl) -> T
-        {
-            return impl(std::move(item));
-        }
-    };
-
-    template <class Func>
-    auto operator()(Func&& func) const -> impl_t<std::decay_t<Func>>
-    {
-        return { std::forward<Func>(func) };
-    }
-};
-
-}  // namespace detail
-
-static constexpr auto apply = detail::apply_fn{};
-static constexpr auto with = detail::with_fn{};
-
-template <class T>
-constexpr auto create(std::function<void(T&)> func) -> T
-{
-    return T{} | with(std::move(func));
 }
 
 auto get_center(sf::Vector2u desktop_size, sf::Vector2u window_size) -> sf::Vector2i
@@ -192,134 +123,23 @@ auto get_center(sf::Vector2u desktop_size, sf::Vector2u window_size) -> sf::Vect
     return { (int)(desktop_size.x / 2 - window_size.x / 2), (int)(desktop_size.y / 2 - window_size.y / 2) };
 }
 
-constexpr auto model_to_canvas_item = [](const Model& m) -> foo::CanvasItem
-{
-    return foo::group(
-        foo::text(str("n = ", std::fixed, m.boids.size()))  //
-            | foo::translate({ 8, 8 + 16 * 0 })             //
-            | foo::fill_color(sf::Color::Red)               //
-            | foo::outline_color(sf::Color::Red)            //
-            | foo::font_size(16),
-        foo::text(str("t = ", std::fixed, m.time_point, "s"))  //
-            | foo::translate({ 8, 8 + 16 * 1 })                //
-            | foo::fill_color(sf::Color::White)                //
-            | foo::outline_color(sf::Color::White)             //
-            | foo::font_size(16),
-        foo::transform(
-            [](const Boid& b) -> foo::CanvasItem
-            {
-                const auto size = vec_t{ 20.F, 30.F };
-                return foo::rect(size)                       //
-                       | foo::fill_color(sf::Color::Yellow)  //
-                       | foo::translate(-size / 2)           //
-                       | foo::rotate(b.angular.location)     //
-                       | foo::translate(b.linear.location);
-            },
-            m.boids),
-        foo::transform(
-            [](const Point& p) -> foo::CanvasItem
-            { return foo::circle(15.F) | foo::translate(p.pos) | foo::fill_color(sf::Color::Green); },
-            m.points));
-};
-
-constexpr auto update = [](Model m, const Command& cmd) -> std::tuple<Model, std::optional<Command>>
-{
-    if (const auto c = std::get_if<Commands::Exit>(&cmd))
-    {
-        std::cout << "Bye!"
-                  << "\n";
-        return { m, {} };
-    }
-    if (const auto c = std::get_if<Commands::Accelerate>(&cmd))
-    {
-        for (auto& b : m.boids)
-        {
-            b.angular.acceleration = c->value;
-        }
-        return { m, {} };
-    }
-    if (const auto c = std::get_if<Commands::AddBoid>(&cmd))
-    {
-        m.boids.push_back(create<Boid>(
-            [&](Boid& b)
-            {
-                b.linear.location = c->pos;
-                b.angular.acceleration = 0.25F;
-            }));
-        return { m, {} };
-    }
-    return { m, {} };
-};
-
-constexpr auto on_tick = [](Model m, const TickEvent& event) -> std::tuple<Model, std::optional<Command>>
-{
-    for (auto& b : m.boids)
-    {
-        b.linear.velocity += b.linear.accelarion * event.elapsed;
-        b.linear.location += b.linear.velocity * event.elapsed;
-
-        b.angular.velocity += b.angular.acceleration * event.elapsed;
-        b.angular.velocity = std::min(b.angular.velocity, +m.max_angular_velocity);
-        b.angular.velocity = std::max(b.angular.velocity, -m.max_angular_velocity);
-        b.angular.location += b.angular.velocity * event.elapsed;
-    }
-    m.time_point += event.elapsed;
-    for (auto& p : m.points)
-    {
-        p.pos = vec_t{ p.animation(m.time_point), p.y };
-    }
-    return { std::move(m), {} };
-};
-
-constexpr auto on_key_pressed = [](Model m, const sf::Event::KeyPressed& e) -> std::tuple<Model, std::optional<Command>>
-{
-    static const auto commands = std::map<sf::Keyboard::Key, Command>{
-        { sf::Keyboard::Key::Escape, Commands::Exit{} },
-        { sf::Keyboard::Key::Q, Commands::Exit{} },
-        { sf::Keyboard::Key::Up, Commands::Accelerate{ +1.F } },
-        { sf::Keyboard::Key::Down, Commands::Accelerate{ -1.F } },
-    };
-    if (const auto commmand = commands.find(e.code); commmand != commands.end())
-    {
-        return { std::move(m), commmand->second };
-    }
-    return { std::move(m), {} };
-};
-
-constexpr auto on_mouse_buttton_pressed
-    = [](Model m, const sf::Event::MouseButtonPressed& e) -> std::tuple<Model, std::optional<Command>>
-{
-    if (e.button == sf::Mouse::Button::Left)
-    {
-        return { std::move(m), Commands::AddBoid{ convert(e.position) } };
-    }
-    return { std::move(m), {} };
-};
-
-Model create_model()
+auto create_model() -> Model
 {
     Model m{};
     m.max_angular_velocity = 1.5F;
     m.time_point = anim::time_point_t{ 0.F };
-    m.boids = { create<Boid>(
-                    [](Boid& b)
-                    {
-                        b.angular.velocity = 1.0F;
-                        b.linear.location = { 300, 300 };
-                    }),
-                create<Boid>(
-                    [](Boid& b)
-                    {
-                        b.angular.velocity = -1.0F;
-                        b.linear.location = { 500, 100 };
-                        b.linear.accelarion = { -1.F, 0.5F };
-                    }),
-                create<Boid>(
-                    [](Boid& b)
-                    {
-                        b.angular.velocity = 2.0F;
-                        b.linear.location = { 400, 200 };
-                    }) };
+    for (int y = 100; y < 600; y += 15)
+    {
+        for (int x = 100; x < 800; x += 15)
+        {
+            m.boids.push_back(create<Boid>(
+                [&](Boid& b)
+                {
+                    b.angular.velocity = ((x / 20) % 2 == 0) ? 1.0F : -1.0F;
+                    b.linear.location = vec_t{ (float)x, (float)y };
+                }));
+        }
+    }
     m.points = {
         create<Point>(
             [](Point& p)
@@ -393,7 +213,42 @@ void run(const std::vector<std::string_view> args)
     auto app = App<Model, Command>{ window, create_model() };
     app.frame_duration = duration_t{ 0.01F };
 
-    app.render = render_model<Model>(arial, model_to_canvas_item);
+    app.render = render_model<Model>(
+        arial,
+        [](const Model& m, fps_t fps) -> foo::CanvasItem
+        {
+            return foo::group(
+                foo::text(str("n = ", std::fixed, m.boids.size()))  //
+                    | foo::translate({ 8, 8 + 16 * 0 })             //
+                    | foo::fill_color(sf::Color::Red)               //
+                    | foo::outline_color(sf::Color::Red)            //
+                    | foo::font_size(16),
+                foo::text(str("t = ", std::fixed, m.time_point, "s"))  //
+                    | foo::translate({ 8, 8 + 16 * 1 })                //
+                    | foo::fill_color(sf::Color::White)                //
+                    | foo::outline_color(sf::Color::White)             //
+                    | foo::font_size(16),
+                foo::text(str("fps = ", std::fixed, fps))   //
+                    | foo::translate({ 8, 8 + 16 * 2 })     //
+                    | foo::fill_color(sf::Color::White)     //
+                    | foo::outline_color(sf::Color::White)  //
+                    | foo::font_size(16),
+                foo::transform(
+                    [](const Boid& b) -> foo::CanvasItem
+                    {
+                        const auto size = vec_t{ 10.F, 15.F };
+                        return foo::rect(size)                       //
+                               | foo::fill_color(sf::Color::Yellow)  //
+                               | foo::translate(-size / 2)           //
+                               | foo::rotate(b.angular.location)     //
+                               | foo::translate(b.linear.location);
+                    },
+                    m.boids),
+                foo::transform(
+                    [](const Point& p) -> foo::CanvasItem
+                    { return foo::circle(15.F) | foo::translate(p.pos) | foo::fill_color(sf::Color::Green); },
+                    m.points));
+        });
     app.on_msg = [](sf::RenderWindow& w, const Command& cmd)
     {
         if (const auto c = std::get_if<Commands::Exit>(&cmd))
@@ -402,16 +257,85 @@ void run(const std::vector<std::string_view> args)
         }
     };
 
-    app.update = update;
+    app.update = [](Model& m, const Command& cmd) -> std::optional<Command>
+    {
+        if (const auto c = std::get_if<Commands::Exit>(&cmd))
+        {
+            std::cout << "Bye!"
+                      << "\n";
+            return {};
+        }
+        else if (const auto c = std::get_if<Commands::Accelerate>(&cmd))
+        {
+            for (auto& b : m.boids)
+            {
+                b.angular.acceleration = c->value;
+            }
+            return {};
+        }
+        else if (const auto c = std::get_if<Commands::AddBoid>(&cmd))
+        {
+            m.boids.push_back(create<Boid>(
+                [&](Boid& b)
+                {
+                    b.linear.location = c->pos;
+                    b.angular.acceleration = 0.25F;
+                }));
+            return {};
+        }
+        else if (const auto c = std::get_if<Commands::Init>(&cmd))
+        {
+            return {};
+        }
+        return {};
+    };
 
-    app.subscribe<InitEvent>(
-        [](Model m, const InitEvent&) -> std::tuple<Model, std::optional<Command>> {
-            return { std::move(m), Commands::Init{} };
+    app.subscribe<InitEvent>([](Model& m, const InitEvent&) -> std::optional<Command> { return Commands::Init{}; });
+
+    app.subscribe<TickEvent>(
+        [](Model& m, const TickEvent& event) -> std::optional<Command>
+        {
+            for (auto& b : m.boids)
+            {
+                b.linear.velocity += b.linear.accelarion * event.elapsed;
+                b.linear.location += b.linear.velocity * event.elapsed;
+
+                b.angular.velocity += b.angular.acceleration * event.elapsed;
+                b.angular.velocity = std::min(b.angular.velocity, +m.max_angular_velocity);
+                b.angular.velocity = std::max(b.angular.velocity, -m.max_angular_velocity);
+                b.angular.location += b.angular.velocity * event.elapsed;
+            }
+            m.time_point += event.elapsed;
+            for (auto& p : m.points)
+            {
+                p.pos = vec_t{ p.animation(m.time_point), p.y };
+            }
+            return {};
         });
-
-    app.subscribe<TickEvent>(on_tick);
-    app.subscribe<sf::Event::KeyPressed>(on_key_pressed);
-    app.subscribe<sf::Event::MouseButtonPressed>(on_mouse_buttton_pressed);
+    app.subscribe<sf::Event::KeyPressed>(
+        [](Model& m, const sf::Event::KeyPressed& e) -> std::optional<Command>
+        {
+            static const auto commands = std::map<sf::Keyboard::Key, Command>{
+                { sf::Keyboard::Key::Escape, Commands::Exit{} },
+                { sf::Keyboard::Key::Q, Commands::Exit{} },
+                { sf::Keyboard::Key::Up, Commands::Accelerate{ +1.F } },
+                { sf::Keyboard::Key::Down, Commands::Accelerate{ -1.F } },
+            };
+            if (const auto commmand = commands.find(e.code); commmand != commands.end())
+            {
+                return commmand->second;
+            }
+            return {};
+        });
+    app.subscribe<sf::Event::MouseButtonPressed>(
+        [](Model& m, const sf::Event::MouseButtonPressed& e) -> std::optional<Command>
+        {
+            if (e.button == sf::Mouse::Button::Left)
+            {
+                return Commands::AddBoid{ convert(e.position) };
+            }
+            return {};
+        });
 
     app.run();
 }

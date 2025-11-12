@@ -19,18 +19,22 @@ struct InitEvent
 {
 };
 
+template <class Model>
+using RendererFn = std::function<void(sf::RenderWindow&, const Model&, fps_t)>;
+
 template <class Model, class Msg>
 struct App
 {
-    using UpdateResult = std::tuple<Model, std::optional<Msg>>;
+    template <class T>
+    using BaseEventHandler = std::function<std::optional<Msg>(Model&, T)>;
     template <class Event>
-    using EventHandler = std::function<UpdateResult(const Model&, const Event&)>;
+    using EventHandler = BaseEventHandler<const Event&>;
 
-    using RenderFn = std::function<void(sf::RenderWindow&, const Model&)>;
+    using RenderFn = RendererFn<Model>;
     using UpdateFn = EventHandler<Msg>;
     using HandleMsgFn = std::function<void(sf::RenderWindow&, const Msg&)>;
 
-    using TypeErasedEventHandler = std::function<UpdateResult(const Model&, const void*)>;
+    using TypeErasedEventHandler = BaseEventHandler<const void*>;
 
     sf::RenderWindow& m_window;
     Model m_model_state;
@@ -40,21 +44,6 @@ struct App
     std::deque<Msg> m_msg_queue = {};
     std::map<std::type_index, TypeErasedEventHandler> m_subscriptions = {};
     duration_t frame_duration = duration_t{ 0.01 };
-
-    void set_model_state(Model model_state)
-    {
-        m_model_state = std::move(model_state);
-    }
-
-    void handle_update_result(UpdateResult event_result)
-    {
-        auto [new_model_state, maybe_msg] = std::move(event_result);
-        set_model_state(std::move(new_model_state));
-        if (maybe_msg)
-        {
-            m_msg_queue.push_back(*maybe_msg);
-        }
-    }
 
     template <class Head, class... Tail>
     void handle_event(const sf::Event& event)
@@ -130,12 +119,16 @@ struct App
                     {
                         on_msg(m_window, msg);
                     }
-                    handle_update_result(update(m_model_state, msg));
+                    const std::optional<Msg> maybe_msg = update(m_model_state, msg);
+                    if (maybe_msg)
+                    {
+                        m_msg_queue.push_back(*maybe_msg);
+                    }
                 }
             }
 
             m_window.clear();
-            render(m_window, m_model_state);
+            render(m_window, m_model_state, fps);
             m_window.display();
         }
     }
@@ -143,9 +136,9 @@ struct App
     template <class Event>
     auto subscribe(EventHandler<Event> event_handler)
     {
-        m_subscriptions.emplace(  //
+        m_subscriptions.emplace(
             std::type_index{ typeid(Event) },
-            [=](const Model& m, const void* ptr) -> UpdateResult
+            [=](Model& m, const void* ptr) -> std::optional<Msg>
             { return event_handler(m, *static_cast<const Event*>(ptr)); });
     }
 
@@ -155,7 +148,12 @@ struct App
         const auto [b, e] = m_subscriptions.equal_range(std::type_index{ typeid(Event) });
         for (auto it = b; it != e; ++it)
         {
-            handle_update_result(it->second(m_model_state, static_cast<const void*>(&event)));
+            const auto& update_fn = it->second;
+            const std::optional<Msg> maybe_msg = it->second(m_model_state, static_cast<const void*>(&event));
+            if (maybe_msg)
+            {
+                m_msg_queue.push_back(*maybe_msg);
+            }
         }
     }
 };
