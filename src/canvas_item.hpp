@@ -3,12 +3,36 @@
 #include <SFML/Graphics.hpp>
 #include <SFML/System.hpp>
 #include <SFML/Window.hpp>
+#include <array>
 #include <cstdint>
 #include <functional>
+#include <mx/mx.hpp>
 
-#include "vec_t.hpp"
+template <class T>
+sf::Vector2<T> convert(const mx::vector_2d<T>& v)
+{
+    return sf::Vector2<T>(v[0], v[1]);
+}
 
-namespace foo
+template <class U, class T>
+sf::Vector2<U> convert(const mx::vector_2d<T>& v)
+{
+    return sf::Vector2<U>(static_cast<U>(v[0]), static_cast<U>(v[1]));
+}
+
+template <class T>
+mx::vector_2d<T> convert(const sf::Vector2<T>& v)
+{
+    return mx::vector_2d<T>{ v.x, v.y };
+}
+
+template <class U, class T>
+mx::vector_2d<U> convert_as(const sf::Vector2<T>& v)
+{
+    return mx::vector_2d<U>{ static_cast<U>(v.x), static_cast<U>(v.y) };
+}
+
+namespace canvas
 {
 
 struct Style
@@ -165,17 +189,17 @@ inline auto blend(sf::BlendMode mode) -> StateModifier
     return modify_render_states([=](sf::RenderStates& render_states) { render_states.blendMode = mode; });
 }
 
-inline auto translate(const vec_t& v) -> StateModifier
+inline auto translate(const mx::vector_2d<float>& v) -> StateModifier
 {
     return modify_render_states([=](sf::RenderStates& render_states) { render_states.transform.translate(convert(v)); });
 }
 
-inline auto scale(const vec_t& v) -> StateModifier
+inline auto scale(const mx::vector_2d<float>& v) -> StateModifier
 {
     return modify_render_states([=](sf::RenderStates& render_states) { render_states.transform.scale(convert(v)); });
 }
 
-inline auto scale(const vec_t& v, const vec_t& pivot) -> StateModifier
+inline auto scale(const mx::vector_2d<float>& v, const mx::vector_2d<float>& pivot) -> StateModifier
 {
     return translate(pivot) | scale(v) | translate(-pivot);
 }
@@ -185,9 +209,14 @@ inline auto rotate(float a) -> StateModifier
     return modify_render_states([=](sf::RenderStates& render_states) { render_states.transform.rotate(sf::radians(a)); });
 }
 
-inline auto rotate(float a, const vec_t& pivot) -> StateModifier
+inline auto rotate(float a, const mx::vector_2d<float>& pivot) -> StateModifier
 {
     return translate(pivot) | rotate(a) | translate(-pivot);
+}
+
+inline auto empty_item() -> CanvasItem
+{
+    return [](Context&, const State&) {};
 }
 
 inline auto group(std::vector<CanvasItem> items) -> CanvasItem
@@ -250,7 +279,7 @@ inline auto text(const sf::String& str) -> CanvasItem
     };
 }
 
-inline auto rect(const vec_t& size) -> CanvasItem
+inline auto rect(const mx::vector_2d<float>& size) -> CanvasItem
 {
     return [=](Context& ctx, const State& state)
     {
@@ -280,7 +309,7 @@ inline auto sprite(const sf::Texture& texture, const sf::IntRect& rect) -> Canva
     };
 }
 
-inline auto grid(const vec_t& size, const vec_t& dist) -> CanvasItem
+inline auto grid(const mx::vector_2d<float>& size, const mx::vector_2d<float>& dist) -> CanvasItem
 {
     return [=](Context& ctx, const State& state)
     {
@@ -305,7 +334,7 @@ inline auto grid(const vec_t& size, const vec_t& dist) -> CanvasItem
     };
 }
 
-inline auto triangle(const std::array<vec_t, 3>& vertices) -> CanvasItem
+inline auto triangle(const std::array<mx::vector_2d<float>, 3>& vertices) -> CanvasItem
 {
     return [=](Context& ctx, const State& state)
     {
@@ -319,12 +348,13 @@ inline auto triangle(const std::array<vec_t, 3>& vertices) -> CanvasItem
     };
 }
 
-inline auto triangle(const vec_t& a, const vec_t& b, const vec_t& c) -> CanvasItem
+inline auto triangle(const mx::vector_2d<float>& a, const mx::vector_2d<float>& b, const mx::vector_2d<float>& c)
+    -> CanvasItem
 {
     return triangle({ a, b, c });
 }
 
-inline auto polygon(const std::vector<vec_t>& vertices) -> CanvasItem
+inline auto polygon(const std::vector<mx::vector_2d<float>>& vertices) -> CanvasItem
 {
     return [=](Context& ctx, const State& state)
     {
@@ -339,4 +369,4 @@ inline auto polygon(const std::vector<vec_t>& vertices) -> CanvasItem
     };
 }
 
-}  // namespace foo
+}  // namespace canvas

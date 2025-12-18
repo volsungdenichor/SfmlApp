@@ -2,8 +2,6 @@
 #include <SFML/Window.hpp>
 #include <cmath>
 #include <cstdint>
-#include <ferrugo/core/functional.hpp>
-#include <ferrugo/core/sequence.hpp>
 #include <functional>
 #include <iomanip>
 #include <iostream>
@@ -15,7 +13,6 @@
 #include "app_runner.hpp"
 #include "canvas_item.hpp"
 #include "functional.hpp"
-#include "vec_t.hpp"
 
 template <class... Args>
 auto str(Args&&... args) -> std::string
@@ -49,9 +46,9 @@ struct Boid
 {
     struct Linear
     {
-        vec_t location = {};
-        vec_t velocity = {};
-        vec_t accelarion = {};
+        mx::vector_2d<float> location = {};
+        mx::vector_2d<float> velocity = {};
+        mx::vector_2d<float> accelarion = {};
     };
     struct Angular
     {
@@ -66,7 +63,7 @@ struct Boid
 
 struct Point
 {
-    vec_t pos;
+    mx::vector_2d<float> pos;
     float y;
     anim::animation<float> animation = anim::constant(0.F, 100.F);
 };
@@ -96,7 +93,7 @@ struct Accelerate
 
 struct AddBoid
 {
-    vec_t pos;
+    mx::vector_2d<float> pos;
 };
 
 struct ToggleInfo
@@ -113,12 +110,13 @@ using Command = std::variant<  //
     Commands::ToggleInfo>;
 
 template <class Model>
-auto render_model(const sf::Font& font, const std::function<foo::CanvasItem(const Model&, fps_t)>& func) -> RendererFn<Model>
+auto render_model(const sf::Font& font, const std::function<canvas::CanvasItem(const Model&, fps_t)>& func)
+    -> RendererFn<Model>
 {
     return [=](sf::RenderWindow& window, const Model& m, fps_t fps)
     {
-        auto ctx = foo::Context{ window };
-        const auto state = foo::State{ foo::Style{}, foo::TextStyle{ font }, sf::RenderStates{} };
+        auto ctx = canvas::Context{ window };
+        const auto state = canvas::State{ canvas::Style{}, canvas::TextStyle{ font }, sf::RenderStates{} };
         const auto scene = func(m, fps);
         scene(ctx, state);
     };
@@ -142,7 +140,7 @@ auto create_model() -> Model
                 [&](Boid& b)
                 {
                     b.angular.velocity = ((x / 20) % 2 == 0) ? 1.0F : -1.0F;
-                    b.linear.location = vec_t{ (float)x, (float)y };
+                    b.linear.location = mx::vector_2d<float>{ (float)x, (float)y };
                 }));
         }
     }
@@ -214,16 +212,14 @@ void run(const std::vector<std::string_view> args)
 
     const sf::Font font = load_font(fonts_dir + "arial.ttf");
 
-    using namespace ferrugo;
-
     auto app = App<Model, Command>{ window, create_model() };
     app.frame_duration = duration_t{ 0.01F };
 
     app.render = render_model<Model>(
         font,
-        [](const Model& m, fps_t fps) -> foo::CanvasItem
+        [](const Model& m, fps_t fps) -> canvas::CanvasItem
         {
-            const auto info = foo::text(
+            const auto info = canvas::text(
                                   str("n = ",
                                       std::fixed,
                                       m.boids.size(),
@@ -232,28 +228,28 @@ void run(const std::vector<std::string_view> args)
                                       m.time_point,
                                       "s\nfps = ",
                                       std::fixed,
-                                      fps))                                 //
-                              | foo::translate({ 8, 8 })                    //
-                              | foo::fill_color(sf::Color::Red)             //
-                              | foo::outline_color(sf::Color::Transparent)  //
-                              | foo::outline_thickness(1.F)                 //
-                              | foo::font_size(12);
-            return foo::group(
-                m.show_info ? info : foo::CanvasItem{ [](foo::Context&, const foo::State&) {} },
-                foo::transform(
-                    [](const Boid& b) -> foo::CanvasItem
+                                      fps))                                    //
+                              | canvas::translate({ 8, 8 })                    //
+                              | canvas::fill_color(sf::Color::Red)             //
+                              | canvas::outline_color(sf::Color::Transparent)  //
+                              | canvas::outline_thickness(1.F)                 //
+                              | canvas::font_size(12);
+            return canvas::group(
+                m.show_info ? info : canvas::empty_item(),
+                canvas::transform(
+                    [](const Boid& b) -> canvas::CanvasItem
                     {
-                        const auto size = vec_t{ 5.F, 7.F };
-                        return foo::rect(size)                       //
-                               | foo::fill_color(sf::Color::Yellow)  //
-                               | foo::translate(-size / 2)           //
-                               | foo::rotate(b.angular.location)     //
-                               | foo::translate(b.linear.location);
+                        const auto size = mx::vector_2d<float>{ 5.F, 7.F };
+                        return canvas::rect(size)                       //
+                               | canvas::fill_color(sf::Color::Yellow)  //
+                               | canvas::translate(-size / 2)           //
+                               | canvas::rotate(b.angular.location)     //
+                               | canvas::translate(b.linear.location);
                     },
                     m.boids),
-                foo::transform(
-                    [](const Point& p) -> foo::CanvasItem
-                    { return foo::circle(15.F) | foo::translate(p.pos) | foo::fill_color(sf::Color::Green); },
+                canvas::transform(
+                    [](const Point& p) -> canvas::CanvasItem
+                    { return canvas::circle(15.F) | canvas::translate(p.pos) | canvas::fill_color(sf::Color::Green); },
                     m.points));
         });
     app.on_msg = [](sf::RenderWindow& w, const Command& cmd)
@@ -320,7 +316,7 @@ void run(const std::vector<std::string_view> args)
             m.time_point += event.elapsed;
             for (auto& p : m.points)
             {
-                p.pos = vec_t{ p.animation(m.time_point), p.y };
+                p.pos = mx::vector_2d<float>{ p.animation(m.time_point), p.y };
             }
             return {};
         });
@@ -345,7 +341,7 @@ void run(const std::vector<std::string_view> args)
         {
             if (e.button == sf::Mouse::Button::Left)
             {
-                return Commands::AddBoid{ convert(e.position) };
+                return Commands::AddBoid{ convert_as<float>(e.position) };
             }
             return {};
         });

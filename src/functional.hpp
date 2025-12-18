@@ -21,14 +21,14 @@ struct apply_fn
         }
 
         template <class T>
-        friend auto operator|(T& item, const impl_t& impl) -> T&
+        constexpr friend auto operator|(T& item, const impl_t& impl) -> T&
         {
             return impl(std::move(item));
         }
     };
 
     template <class Func>
-    auto operator()(Func&& func) const -> impl_t<std::decay_t<Func>>
+    constexpr auto operator()(Func&& func) const -> impl_t<std::decay_t<Func>>
     {
         return { std::forward<Func>(func) };
     }
@@ -48,14 +48,14 @@ struct with_fn
         }
 
         template <class T>
-        friend auto operator|(T item, const impl_t& impl) -> T
+        constexpr friend auto operator|(T item, const impl_t& impl) -> T
         {
             return impl(std::move(item));
         }
     };
 
     template <class Func>
-    auto operator()(Func&& func) const -> impl_t<std::decay_t<Func>>
+    constexpr auto operator()(Func&& func) const -> impl_t<std::decay_t<Func>>
     {
         return { std::forward<Func>(func) };
     }

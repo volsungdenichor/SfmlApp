@@ -7,15 +7,15 @@ FetchContent_Declare(SFML
     EXCLUDE_FROM_ALL
     SYSTEM)
 
-FetchContent_Declare(ferrugo-core
-    GIT_REPOSITORY https://github.com/volsungdenichor/ferrugo-core.git
-    GIT_TAG main)
+set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
+set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 
-FetchContent_Declare(ferrugo-alg
-    GIT_REPOSITORY https://github.com/volsungdenichor/ferrugo-alg.git
-    GIT_TAG main)
+FetchContent_Declare(mx
+    GIT_REPOSITORY https://github.com/volsungdenichor/mx.git
+    GIT_TAG main
+    EXCLUDE_FROM_ALL
+    SYSTEM)
 
-FetchContent_MakeAvailable(ferrugo-core ferrugo-alg SFML)
+FetchContent_MakeAvailable(mx SFML)
 
-include_directories(${ferrugo-core_SOURCE_DIR}/include)
-include_directories(${ferrugo-alg_SOURCE_DIR}/include)
+include_directories(${mx_SOURCE_DIR}/include)
