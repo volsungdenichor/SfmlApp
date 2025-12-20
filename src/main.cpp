@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <iostream>
 #include <memory>
+#include <mx/dcel.hpp>
 #include <sstream>
 #include <variant>
 
@@ -42,39 +43,36 @@ inline auto load_font(const std::string& path) -> sf::Font
     return result;
 }
 
-struct Boid
-{
-    struct Linear
-    {
-        mx::vector_2d<float> location = {};
-        mx::vector_2d<float> velocity = {};
-        mx::vector_2d<float> accelarion = {};
-    };
-    struct Angular
-    {
-        float location = 0.F;
-        float velocity = 0;
-        float acceleration = 0;
-    };
-
-    Linear linear;
-    Angular angular;
-};
-
-struct Point
-{
-    mx::vector_2d<float> pos;
-    float y;
-    anim::animation<float> animation = anim::constant(0.F, 100.F);
-};
-
 struct Model
 {
-    anim::time_point_t time_point;
-    std::vector<Boid> boids;
-    std::vector<Point> points;
-    float max_angular_velocity;
-    bool show_info = false;
+    std::vector<mx::vector<float, 2>> points;
+    std::optional<mx::dcel<float>> dcel;
+    std::optional<mx::dcel<float>> voronoi;
+
+    void update()
+    {
+        try
+        {
+            dcel = mx::triangulate(points);
+        }
+        catch (const std::exception& e)
+        {
+            std::cout << "error on triangulation: " << e.what() << '\n';
+            dcel = std::nullopt;
+        }
+        if (dcel)
+        {
+            try
+            {
+                voronoi = mx::voronoi(*dcel);
+            }
+            catch (const std::exception& e)
+            {
+                std::cout << "error on voronoi: " << e.what() << '\n';
+                voronoi = std::nullopt;
+            }
+        }
+    }
 };
 
 namespace Commands
@@ -86,18 +84,9 @@ struct Init
 struct Exit
 {
 };
-struct Accelerate
-{
-    float value;
-};
-
-struct AddBoid
+struct AddPoint
 {
     mx::vector_2d<float> pos;
-};
-
-struct ToggleInfo
-{
 };
 
 }  // namespace Commands
@@ -105,9 +94,7 @@ struct ToggleInfo
 using Command = std::variant<  //
     Commands::Init,
     Commands::Exit,
-    Commands::Accelerate,
-    Commands::AddBoid,
-    Commands::ToggleInfo>;
+    Commands::AddPoint>;
 
 template <class Model>
 auto render_model(const sf::Font& font, const std::function<canvas::CanvasItem(const Model&, fps_t)>& func)
@@ -130,75 +117,10 @@ auto get_center(sf::Vector2u desktop_size, sf::Vector2u window_size) -> sf::Vect
 auto create_model() -> Model
 {
     Model m{};
-    m.max_angular_velocity = 1.5F;
-    m.time_point = anim::time_point_t{ 0.F };
-    for (int y = 100; y < 700; y += 15)
-    {
-        for (int x = 100; x < 900; x += 15)
-        {
-            m.boids.push_back(create<Boid>(
-                [&](Boid& b)
-                {
-                    b.angular.velocity = ((x / 20) % 2 == 0) ? 1.0F : -1.0F;
-                    b.linear.location = mx::vector_2d<float>{ (float)x, (float)y };
-                }));
-        }
-    }
-    m.points = {
-        create<Point>(
-            [](Point& p)
-            {
-                p.animation = anim::ping_pong(anim::gradual(0.F, 500.F, anim::duration_t{ 1 }, anim::ease::none), 10.0F);
-                p.y = 50;
-            }),
-        create<Point>(
-            [](Point& p)
-            {
-                p.animation
-                    = anim::ping_pong(anim::gradual(0.F, 500.F, anim::duration_t{ 1 }, anim::ease::quad_in_out), 10.0F);
-                p.y = 100;
-            }),
-        create<Point>(
-            [](Point& p)
-            {
-                p.animation = anim::ping_pong(anim::gradual(0.F, 500.F, anim::duration_t{ 1 }, anim::ease::quad_in), 10.0F);
-                p.y = 150;
-            }),
-        create<Point>(
-            [](Point& p)
-            {
-                p.animation = anim::ping_pong(anim::gradual(0.F, 500.F, anim::duration_t{ 1 }, anim::ease::quad_out), 10.0F);
-                p.y = 200;
-            }),
-        create<Point>(
-            [](Point& p)
-            {
-                p.animation
-                    = anim::ping_pong(anim::gradual(0.F, 500.F, anim::duration_t{ 1 }, anim::ease::cubic_in_out), 10.0F);
-                p.y = 300;
-            }),
-        create<Point>(
-            [](Point& p)
-            {
-                p.animation = anim::ping_pong(anim::gradual(0.F, 500.F, anim::duration_t{ 1 }, anim::ease::cubic_in), 10.0F);
-                p.y = 350;
-            }),
-        create<Point>(
-            [](Point& p)
-            {
-                p.animation
-                    = anim::ping_pong(anim::gradual(0.F, 500.F, anim::duration_t{ 1 }, anim::ease::cubic_out), 10.0F);
-                p.y = 400;
-            }),
-        create<Point>(
-            [](Point& p)
-            {
-                p.animation
-                    = anim::ping_pong(anim::gradual(0.F, 500.F, anim::duration_t{ 1 }, anim::ease::circ_in_out), 10.0F);
-                p.y = 500;
-            })
-
-    };
+    m.points = {};
+    m.dcel = std::nullopt;
+    m.voronoi = std::nullopt;
+    m.update();
     return m;
 }
 
@@ -219,38 +141,37 @@ void run(const std::vector<std::string_view> args)
         font,
         [](const Model& m, fps_t fps) -> canvas::CanvasItem
         {
-            const auto info = canvas::text(
-                                  str("n = ",
-                                      std::fixed,
-                                      m.boids.size(),
-                                      "\nt = ",
-                                      std::fixed,
-                                      m.time_point,
-                                      "s\nfps = ",
-                                      std::fixed,
-                                      fps))                                    //
-                              | canvas::translate({ 8, 8 })                    //
-                              | canvas::fill_color(sf::Color::Red)             //
-                              | canvas::outline_color(sf::Color::Transparent)  //
-                              | canvas::outline_thickness(1.F)                 //
-                              | canvas::font_size(12);
-            return canvas::group(
-                m.show_info ? info : canvas::empty_item(),
-                canvas::transform(
-                    [](const Boid& b) -> canvas::CanvasItem
+            std::vector<canvas::CanvasItem> items;
+            if (m.voronoi)
+            {
+                m.voronoi->faces(
+                    [&](const auto& face)
                     {
-                        const auto size = mx::vector_2d<float>{ 5.F, 7.F };
-                        return canvas::rect(size)                       //
-                               | canvas::fill_color(sf::Color::Yellow)  //
-                               | canvas::translate(-size / 2)           //
-                               | canvas::rotate(b.angular.location)     //
-                               | canvas::translate(b.linear.location);
-                    },
-                    m.boids),
-                canvas::transform(
-                    [](const Point& p) -> canvas::CanvasItem
-                    { return canvas::circle(15.F) | canvas::translate(p.pos) | canvas::fill_color(sf::Color::Green); },
-                    m.points));
+                        items.push_back(
+                            canvas::polygon(face.as_polygon())            //
+                            | canvas::outline_thickness(2.F)              //
+                            | canvas::fill_color(sf::Color::Transparent)  //
+                            | canvas::outline_color(sf::Color::Blue));
+                    });
+            }
+            if (m.dcel)
+            {
+                m.dcel->faces(
+                    [&](const auto& face)
+                    {
+                        items.push_back(
+                            canvas::polygon(face.as_polygon())            //
+                            | canvas::outline_thickness(2.F)              //
+                            | canvas::fill_color(sf::Color::Transparent)  //
+                            | canvas::outline_color(sf::Color::White));
+                    });
+            }
+            items.push_back(canvas::transform(
+                [](const mx::vector_2d<float>& p) -> canvas::CanvasItem
+                { return canvas::point(p, 5.F) | canvas::fill_color(sf::Color::Yellow); },
+                m.points));
+
+            return canvas::group(std::move(items));
         });
     app.on_msg = [](sf::RenderWindow& w, const Command& cmd)
     {
@@ -268,31 +189,14 @@ void run(const std::vector<std::string_view> args)
                       << "\n";
             return {};
         }
-        else if (const auto c = std::get_if<Commands::Accelerate>(&cmd))
+        else if (const auto c = std::get_if<Commands::AddPoint>(&cmd))
         {
-            for (auto& b : m.boids)
-            {
-                b.angular.acceleration = c->value;
-            }
-            return {};
-        }
-        else if (const auto c = std::get_if<Commands::AddBoid>(&cmd))
-        {
-            m.boids.push_back(create<Boid>(
-                [&](Boid& b)
-                {
-                    b.linear.location = c->pos;
-                    b.angular.acceleration = 0.25F;
-                }));
+            m.points.push_back(c->pos);
+            m.update();
             return {};
         }
         else if (const auto c = std::get_if<Commands::Init>(&cmd))
         {
-            return {};
-        }
-        else if (const auto c = std::get_if<Commands::ToggleInfo>(&cmd))
-        {
-            m.show_info = !m.show_info;
             return {};
         }
         return {};
@@ -300,39 +204,13 @@ void run(const std::vector<std::string_view> args)
 
     app.subscribe<InitEvent>([](Model& m, const InitEvent&) -> std::optional<Command> { return Commands::Init{}; });
 
-    app.subscribe<TickEvent>(
-        [](Model& m, const TickEvent& event) -> std::optional<Command>
-        {
-            for (auto& b : m.boids)
-            {
-                b.linear.velocity += b.linear.accelarion * event.elapsed;
-                b.linear.location += b.linear.velocity * event.elapsed;
-
-                b.angular.velocity += b.angular.acceleration * event.elapsed;
-                b.angular.velocity = std::min(b.angular.velocity, +m.max_angular_velocity);
-                b.angular.velocity = std::max(b.angular.velocity, -m.max_angular_velocity);
-                b.angular.location += b.angular.velocity * event.elapsed;
-            }
-            m.time_point += event.elapsed;
-            for (auto& p : m.points)
-            {
-                p.pos = mx::vector_2d<float>{ p.animation(m.time_point), p.y };
-            }
-            return {};
-        });
+    app.subscribe<TickEvent>([](Model& m, const TickEvent& event) -> std::optional<Command> { return {}; });
     app.subscribe<sf::Event::KeyPressed>(
         [](Model& m, const sf::Event::KeyPressed& e) -> std::optional<Command>
         {
-            static const auto commands = std::map<sf::Keyboard::Key, Command>{
-                { sf::Keyboard::Key::Escape, Commands::Exit{} },
-                { sf::Keyboard::Key::Q, Commands::Exit{} },
-                { sf::Keyboard::Key::Up, Commands::Accelerate{ +1.F } },
-                { sf::Keyboard::Key::Down, Commands::Accelerate{ -1.F } },
-                { sf::Keyboard::Key::F, Commands::ToggleInfo{} },
-            };
-            if (const auto commmand = commands.find(e.code); commmand != commands.end())
+            if (e.code == sf::Keyboard::Key::Escape)
             {
-                return commmand->second;
+                return Commands::Exit{};
             }
             return {};
         });
@@ -341,7 +219,7 @@ void run(const std::vector<std::string_view> args)
         {
             if (e.button == sf::Mouse::Button::Left)
             {
-                return Commands::AddBoid{ convert_as<float>(e.position) };
+                return Commands::AddPoint{ convert_as<float>(e.position) };
             }
             return {};
         });

@@ -9,27 +9,27 @@
 #include <mx/mx.hpp>
 
 template <class T>
-sf::Vector2<T> convert(const mx::vector_2d<T>& v)
+sf::Vector2<T> convert(const mx::vector<T, 2>& v)
 {
     return sf::Vector2<T>(v[0], v[1]);
 }
 
 template <class U, class T>
-sf::Vector2<U> convert(const mx::vector_2d<T>& v)
+sf::Vector2<U> convert(const mx::vector<T, 2>& v)
 {
     return sf::Vector2<U>(static_cast<U>(v[0]), static_cast<U>(v[1]));
 }
 
 template <class T>
-mx::vector_2d<T> convert(const sf::Vector2<T>& v)
+mx::vector<T, 2> convert(const sf::Vector2<T>& v)
 {
-    return mx::vector_2d<T>{ v.x, v.y };
+    return mx::vector<T, 2>{ v.x, v.y };
 }
 
 template <class U, class T>
-mx::vector_2d<U> convert_as(const sf::Vector2<T>& v)
+mx::vector<U, 2> convert_as(const sf::Vector2<T>& v)
 {
-    return mx::vector_2d<U>{ static_cast<U>(v.x), static_cast<U>(v.y) };
+    return mx::vector<U, 2>{ static_cast<U>(v.x), static_cast<U>(v.y) };
 }
 
 namespace canvas
@@ -189,17 +189,17 @@ inline auto blend(sf::BlendMode mode) -> StateModifier
     return modify_render_states([=](sf::RenderStates& render_states) { render_states.blendMode = mode; });
 }
 
-inline auto translate(const mx::vector_2d<float>& v) -> StateModifier
+inline auto translate(const mx::vector<float, 2>& v) -> StateModifier
 {
     return modify_render_states([=](sf::RenderStates& render_states) { render_states.transform.translate(convert(v)); });
 }
 
-inline auto scale(const mx::vector_2d<float>& v) -> StateModifier
+inline auto scale(const mx::vector<float, 2>& v) -> StateModifier
 {
     return modify_render_states([=](sf::RenderStates& render_states) { render_states.transform.scale(convert(v)); });
 }
 
-inline auto scale(const mx::vector_2d<float>& v, const mx::vector_2d<float>& pivot) -> StateModifier
+inline auto scale(const mx::vector<float, 2>& v, const mx::vector<float, 2>& pivot) -> StateModifier
 {
     return translate(pivot) | scale(v) | translate(-pivot);
 }
@@ -209,7 +209,7 @@ inline auto rotate(float a) -> StateModifier
     return modify_render_states([=](sf::RenderStates& render_states) { render_states.transform.rotate(sf::radians(a)); });
 }
 
-inline auto rotate(float a, const mx::vector_2d<float>& pivot) -> StateModifier
+inline auto rotate(float a, const mx::vector<float, 2>& pivot) -> StateModifier
 {
     return translate(pivot) | rotate(a) | translate(-pivot);
 }
@@ -279,7 +279,7 @@ inline auto text(const sf::String& str) -> CanvasItem
     };
 }
 
-inline auto rect(const mx::vector_2d<float>& size) -> CanvasItem
+inline auto rect(const mx::vector<float, 2>& size) -> CanvasItem
 {
     return [=](Context& ctx, const State& state)
     {
@@ -299,6 +299,16 @@ inline auto circle(float r) -> CanvasItem
     };
 }
 
+inline auto circle(const mx::circle<float>& c) -> CanvasItem
+{
+    return circle(c.radius) | translate(c.center - mx::vector<float, 2>{ c.radius, c.radius });
+}
+
+inline auto point(const mx::vector<float, 2>& p, float radius = 3.F) -> canvas::CanvasItem
+{
+    return circle(mx::circle<float>{ p, radius });
+}
+
 inline auto sprite(const sf::Texture& texture, const sf::IntRect& rect) -> CanvasItem
 {
     return [&texture, rect](Context& ctx, const State& state)
@@ -309,7 +319,7 @@ inline auto sprite(const sf::Texture& texture, const sf::IntRect& rect) -> Canva
     };
 }
 
-inline auto grid(const mx::vector_2d<float>& size, const mx::vector_2d<float>& dist) -> CanvasItem
+inline auto grid(const mx::vector<float, 2>& size, const mx::vector<float, 2>& dist) -> CanvasItem
 {
     return [=](Context& ctx, const State& state)
     {
@@ -334,7 +344,7 @@ inline auto grid(const mx::vector_2d<float>& size, const mx::vector_2d<float>& d
     };
 }
 
-inline auto triangle(const std::array<mx::vector_2d<float>, 3>& vertices) -> CanvasItem
+inline auto triangle(const std::array<mx::vector<float, 2>, 3>& vertices) -> CanvasItem
 {
     return [=](Context& ctx, const State& state)
     {
@@ -348,13 +358,13 @@ inline auto triangle(const std::array<mx::vector_2d<float>, 3>& vertices) -> Can
     };
 }
 
-inline auto triangle(const mx::vector_2d<float>& a, const mx::vector_2d<float>& b, const mx::vector_2d<float>& c)
+inline auto triangle(const mx::vector<float, 2>& a, const mx::vector<float, 2>& b, const mx::vector<float, 2>& c)
     -> CanvasItem
 {
     return triangle({ a, b, c });
 }
 
-inline auto polygon(const std::vector<mx::vector_2d<float>>& vertices) -> CanvasItem
+inline auto polygon(const std::vector<mx::vector<float, 2>>& vertices) -> CanvasItem
 {
     return [=](Context& ctx, const State& state)
     {
@@ -365,6 +375,30 @@ inline auto polygon(const std::vector<mx::vector_2d<float>>& vertices) -> Canvas
             shape.setPoint(i, convert(vertices[i]));
         }
         apply_style(shape, state.style);
+        ctx.target.draw(shape, state.render_states);
+    };
+}
+
+inline auto shape(const mx::circle<float>& item) -> CanvasItem
+{
+    return circle(item);
+}
+
+inline auto shape(const mx::triangle<float, 2>& item) -> CanvasItem
+{
+    return triangle(item);
+}
+
+inline auto shape(const mx::segment<float, 2>& item) -> CanvasItem
+{
+    return [=](Context& ctx, const State& state)
+    {
+        sf::VertexArray shape(sf::PrimitiveType::Lines, 2);
+        for (std::size_t i = 0; i < 2; ++i)
+        {
+            shape[i].position = convert(item[i]);
+            shape[i].color = state.style.outline_color;
+        }
         ctx.target.draw(shape, state.render_states);
     };
 }
