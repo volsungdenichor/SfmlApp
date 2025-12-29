@@ -144,7 +144,7 @@ void run(const std::vector<std::string_view> args)
             std::vector<canvas::CanvasItem> items;
             if (m.voronoi)
             {
-                m.voronoi->faces(
+                m.voronoi->faces()(
                     [&](const auto& face)
                     {
                         items.push_back(
@@ -156,7 +156,7 @@ void run(const std::vector<std::string_view> args)
             }
             if (m.dcel)
             {
-                m.dcel->faces(
+                m.dcel->faces()(
                     [&](const auto& face)
                     {
                         items.push_back(
