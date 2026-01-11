@@ -16,6 +16,15 @@ FetchContent_Declare(mx
     EXCLUDE_FROM_ALL
     SYSTEM)
 
-FetchContent_MakeAvailable(mx SFML)
+set(ZX_BUILD_SEQUENCE ON CACHE BOOL "" FORCE)
+set(ZX_BUILD_FUNCTIONAL ON CACHE BOOL "" FORCE)
+
+FetchContent_Declare(zx
+    GIT_REPOSITORY git@github.com:volsungdenichor/zx.git
+    GIT_TAG main
+    EXCLUDE_FROM_ALL
+    SYSTEM)
+
+FetchContent_MakeAvailable(mx zx SFML)
 
 include_directories(${mx_SOURCE_DIR}/include)

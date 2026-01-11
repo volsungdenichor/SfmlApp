@@ -9,11 +9,12 @@
 #include <mx/dcel.hpp>
 #include <sstream>
 #include <variant>
+#include <zx/functional.hpp>
+#include <zx/sequence.hpp>
 
 #include "animation.hpp"
 #include "app_runner.hpp"
 #include "canvas_item.hpp"
-#include "functional.hpp"
 
 template <class... Args>
 auto str(Args&&... args) -> std::string
@@ -152,6 +153,7 @@ void run(const std::vector<std::string_view> args)
                             | canvas::outline_thickness(2.F)              //
                             | canvas::fill_color(sf::Color::Transparent)  //
                             | canvas::outline_color(sf::Color::Blue));
+                        return true;
                     });
             }
             if (m.dcel)
@@ -164,6 +166,7 @@ void run(const std::vector<std::string_view> args)
                             | canvas::outline_thickness(2.F)              //
                             | canvas::fill_color(sf::Color::Transparent)  //
                             | canvas::outline_color(sf::Color::White));
+                        return true;
                     });
             }
             items.push_back(canvas::transform(
