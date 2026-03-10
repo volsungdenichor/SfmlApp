@@ -58,7 +58,7 @@ struct Model
         }
         catch (const std::exception& e)
         {
-            std::cout << "error on triangulation: " << e.what() << '\n';
+            // std::cout << "error on triangulation: " << e.what() << '\n';
             dcel = std::nullopt;
         }
         if (dcel)
@@ -69,7 +69,7 @@ struct Model
             }
             catch (const std::exception& e)
             {
-                std::cout << "error on voronoi: " << e.what() << '\n';
+                // std::cout << "error on voronoi: " << e.what() << '\n';
                 voronoi = std::nullopt;
             }
         }
@@ -152,7 +152,7 @@ void run(const std::vector<std::string_view> args)
                             canvas::polygon(face.as_polygon())            //
                             | canvas::outline_thickness(2.F)              //
                             | canvas::fill_color(sf::Color::Transparent)  //
-                            | canvas::outline_color(sf::Color::Blue));
+                            | canvas::outline_color(sf::Color::Red));
                         return true;
                     });
             }

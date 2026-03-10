@@ -348,12 +348,13 @@ inline auto triangle(const std::array<mx::vector<float, 2>, 3>& vertices) -> Can
 {
     return [=](Context& ctx, const State& state)
     {
-        sf::VertexArray shape(sf::PrimitiveType::Triangles, 3);
-        for (std::size_t i = 0; i < 3; ++i)
+        sf::ConvexShape shape{};
+        shape.setPointCount(vertices.size());
+        for (std::size_t i = 0; i < vertices.size(); ++i)
         {
-            shape[i].position = convert(vertices[i]);
-            shape[i].color = state.style.fill_color;
+            shape.setPoint(i, convert(vertices[i]));
         }
+        apply_style(shape, state.style);
         ctx.target.draw(shape, state.render_states);
     };
 }
@@ -401,6 +402,11 @@ inline auto shape(const mx::segment<float, 2>& item) -> CanvasItem
         }
         ctx.target.draw(shape, state.render_states);
     };
+}
+
+inline auto shape(const mx::vector<float, 2>& item) -> CanvasItem
+{
+    return point(item);
 }
 
 }  // namespace canvas
