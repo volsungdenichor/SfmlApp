@@ -8,5 +8,5 @@ option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 include(dependencies.cmake)
 
 add_executable(main src/main.cpp)
-target_link_libraries(main PRIVATE sfml-graphics zx::sequence zx::functional)
+target_link_libraries(main PRIVATE sfml-graphics zx::sequence zx::functional zx::mat zx::geometry)
 target_compile_features(main PRIVATE cxx_std_17)

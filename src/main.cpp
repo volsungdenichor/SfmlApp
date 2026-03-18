@@ -6,11 +6,12 @@
 #include <iomanip>
 #include <iostream>
 #include <memory>
-#include <mx/dcel.hpp>
 #include <sstream>
 #include <variant>
+#include <zx/dcel.hpp>
 #include <zx/functional.hpp>
 #include <zx/sequence.hpp>
+#include <zx/triangulation.hpp>
 
 #include "animation.hpp"
 #include "app_runner.hpp"
@@ -46,15 +47,15 @@ inline auto load_font(const std::string& path) -> sf::Font
 
 struct Model
 {
-    std::vector<mx::vector<float, 2>> points;
-    std::optional<mx::dcel<float>> dcel;
-    std::optional<mx::dcel<float>> voronoi;
+    std::vector<zx::mat::vector_t<float, 2>> points;
+    std::optional<zx::geometry::dcel_t<float>> dcel;
+    std::optional<zx::geometry::dcel_t<float>> voronoi;
 
     void update()
     {
         try
         {
-            dcel = mx::triangulate(points);
+            dcel = zx::geometry::triangulate(points);
         }
         catch (const std::exception& e)
         {
@@ -65,7 +66,7 @@ struct Model
         {
             try
             {
-                voronoi = mx::voronoi(*dcel);
+                voronoi = zx::geometry::voronoi(*dcel);
             }
             catch (const std::exception& e)
             {
@@ -87,7 +88,7 @@ struct Exit
 };
 struct AddPoint
 {
-    mx::vector_2d<float> pos;
+    zx::mat::vector_t<float, 2> pos;
 };
 
 }  // namespace Commands
@@ -145,32 +146,28 @@ void run(const std::vector<std::string_view> args)
             std::vector<canvas::CanvasItem> items;
             if (m.voronoi)
             {
-                m.voronoi->faces()(
-                    [&](const auto& face)
-                    {
-                        items.push_back(
-                            canvas::polygon(face.as_polygon())            //
-                            | canvas::outline_thickness(2.F)              //
-                            | canvas::fill_color(sf::Color::Transparent)  //
-                            | canvas::outline_color(sf::Color::Red));
-                        return true;
-                    });
+                for (const auto& face : m.voronoi->faces())
+                {
+                    items.push_back(
+                        canvas::polygon(face.as_polygon())            //
+                        | canvas::outline_thickness(2.F)              //
+                        | canvas::fill_color(sf::Color::Transparent)  //
+                        | canvas::outline_color(sf::Color::Red));
+                }
             }
             if (m.dcel)
             {
-                m.dcel->faces()(
-                    [&](const auto& face)
-                    {
-                        items.push_back(
-                            canvas::polygon(face.as_polygon())            //
-                            | canvas::outline_thickness(2.F)              //
-                            | canvas::fill_color(sf::Color::Transparent)  //
-                            | canvas::outline_color(sf::Color::White));
-                        return true;
-                    });
+                for (const auto& face : m.dcel->faces())
+                {
+                    items.push_back(
+                        canvas::polygon(face.as_polygon())            //
+                        | canvas::outline_thickness(2.F)              //
+                        | canvas::fill_color(sf::Color::Transparent)  //
+                        | canvas::outline_color(sf::Color::White));
+                }
             }
             items.push_back(canvas::transform(
-                [](const mx::vector_2d<float>& p) -> canvas::CanvasItem
+                [](const zx::mat::vector_t<float, 2>& p) -> canvas::CanvasItem
                 { return canvas::point(p, 5.F) | canvas::fill_color(sf::Color::Yellow); },
                 m.points));
 

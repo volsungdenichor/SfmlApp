@@ -10,21 +10,25 @@ FetchContent_Declare(SFML
 set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
 set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 
-FetchContent_Declare(mx
-    GIT_REPOSITORY https://github.com/volsungdenichor/mx.git
-    GIT_TAG main
-    EXCLUDE_FROM_ALL
-    SYSTEM)
-
 set(ZX_BUILD_SEQUENCE ON CACHE BOOL "" FORCE)
 set(ZX_BUILD_FUNCTIONAL ON CACHE BOOL "" FORCE)
+set(ZX_BUILD_MAT ON CACHE BOOL "" FORCE)
+set(ZX_BUILD_GEOMETRY ON CACHE BOOL "" FORCE)
 
-FetchContent_Declare(zx
-    GIT_REPOSITORY git@github.com:volsungdenichor/zx.git
-    GIT_TAG main
-    EXCLUDE_FROM_ALL
-    SYSTEM)
+set(ZX_SOURCE_DIR "" CACHE PATH "Path to local zx source directory")
 
-FetchContent_MakeAvailable(mx zx SFML)
+if(ZX_SOURCE_DIR)
+    message(STATUS "Using local zx source from: ${ZX_SOURCE_DIR}")
+    FetchContent_Declare(zx
+        SOURCE_DIR ${ZX_SOURCE_DIR}
+        EXCLUDE_FROM_ALL
+        SYSTEM)
+else()
+    FetchContent_Declare(zx
+        GIT_REPOSITORY git@github.com:volsungdenichor/zx.git
+        GIT_TAG main
+        EXCLUDE_FROM_ALL
+        SYSTEM)
+endif()
 
-include_directories(${mx_SOURCE_DIR}/include)
+FetchContent_MakeAvailable(zx SFML)
