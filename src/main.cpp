@@ -59,7 +59,10 @@ inline auto create_model() -> Model
 {
     Model model = {};
     model.points_model.points = {
-        { 50.F, anim::ping_pong(anim::gradual(0.F, 500.F, anim::duration_t{ 1 }, anim::ease::none), 10.0F) },
+        { 50.F, anim::ping_pong(anim::gradual(0.F, 500.F, anim::duration_t{ 1.F }, anim::ease::none), 10.0F) },
+        { 100.F, anim::ping_pong(anim::gradual(0.F, 500.F, anim::duration_t{ 1.F }, anim::ease::quad_in_out), 10.0F) },
+        { 150.F, anim::ping_pong(anim::gradual(0.F, 500.F, anim::duration_t{ 1.F }, anim::ease::quad_in), 10.0F) },
+        { 200.F, anim::ping_pong(anim::gradual(0.F, 500.F, anim::duration_t{ 1.F }, anim::ease::quad_out), 10.0F) },
     };
     return model;
 }
