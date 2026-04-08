@@ -15,19 +15,12 @@
 
 #include "animation.hpp"
 #include "app_runner.hpp"
-#include "canvas_item.hpp"
-
-template <class... Args>
-auto str(Args&&... args) -> std::string
-{
-    std::stringstream ss;
-    (ss << ... << std::forward<Args>(args));
-    return ss.str();
-}
+#include "model.hpp"
+#include "view.hpp"
 
 inline auto load_texture(const std::string& path) -> sf::Texture
 {
-    sf::Texture result{};
+    sf::Texture result = {};
     if (!result.loadFromFile(path))
     {
         throw std::runtime_error{ "Unable to load texture from " + path };
@@ -37,7 +30,7 @@ inline auto load_texture(const std::string& path) -> sf::Texture
 
 inline auto load_font(const std::string& path) -> sf::Font
 {
-    sf::Font result{};
+    sf::Font result = {};
     if (!result.openFromFile(path))
     {
         throw std::runtime_error{ "Unable to load font from " + path };
@@ -45,62 +38,8 @@ inline auto load_font(const std::string& path) -> sf::Font
     return result;
 }
 
-struct Model
-{
-    std::vector<zx::mat::vector_t<float, 2>> points;
-    std::optional<zx::geometry::dcel_t<float>> dcel;
-    std::optional<zx::geometry::dcel_t<float>> voronoi;
-
-    void update()
-    {
-        try
-        {
-            dcel = zx::geometry::triangulate(points);
-        }
-        catch (const std::exception& e)
-        {
-            // std::cout << "error on triangulation: " << e.what() << '\n';
-            dcel = std::nullopt;
-        }
-        if (dcel)
-        {
-            try
-            {
-                voronoi = zx::geometry::voronoi(*dcel);
-            }
-            catch (const std::exception& e)
-            {
-                // std::cout << "error on voronoi: " << e.what() << '\n';
-                voronoi = std::nullopt;
-            }
-        }
-    }
-};
-
-namespace Commands
-{
-
-struct Init
-{
-};
-struct Exit
-{
-};
-struct AddPoint
-{
-    zx::mat::vector_t<float, 2> pos;
-};
-
-}  // namespace Commands
-
-using Command = std::variant<  //
-    Commands::Init,
-    Commands::Exit,
-    Commands::AddPoint>;
-
 template <class Model>
-auto render_model(const sf::Font& font, const std::function<canvas::CanvasItem(const Model&, fps_t)>& func)
-    -> RendererFn<Model>
+auto render_model(const sf::Font& font, const std::function<canvas::DrawOp(const Model&, fps_t)>& func) -> RendererFn<Model>
 {
     return [=](sf::RenderWindow& window, const Model& m, fps_t fps)
     {
@@ -111,68 +50,15 @@ auto render_model(const sf::Font& font, const std::function<canvas::CanvasItem(c
     };
 }
 
-auto get_center(sf::Vector2u desktop_size, sf::Vector2u window_size) -> sf::Vector2i
+inline auto get_center(sf::Vector2u desktop_size, sf::Vector2u window_size) -> sf::Vector2i
 {
     return { (int)(desktop_size.x / 2 - window_size.x / 2), (int)(desktop_size.y / 2 - window_size.y / 2) };
 }
 
-auto create_model() -> Model
+inline auto create_app(sf::RenderWindow& window) -> App<Model, Command>
 {
-    Model m{};
-    m.points = {};
-    m.dcel = std::nullopt;
-    m.voronoi = std::nullopt;
-    m.update();
-    return m;
-}
-
-void run(const std::vector<std::string_view> args)
-{
-    static const std::string fonts_dir = R"(/mnt/c/Windows/Fonts/)";
-
-    auto window = sf::RenderWindow(sf::VideoMode({ 1024, 768 }), "CMake SFML Project");
-    const auto desktop_size = sf::VideoMode::getDesktopMode().size;
-    window.setPosition(get_center(sf::VideoMode::getDesktopMode().size, window.getSize()));
-
-    const sf::Font font = load_font(fonts_dir + "arial.ttf");
-
-    auto app = App<Model, Command>{ window, create_model() };
+    auto app = App<Model, Command>{ window, Model{} };
     app.frame_duration = duration_t{ 0.01F };
-
-    app.render = render_model<Model>(
-        font,
-        [](const Model& m, fps_t fps) -> canvas::CanvasItem
-        {
-            std::vector<canvas::CanvasItem> items;
-            if (m.voronoi)
-            {
-                for (const auto& face : m.voronoi->faces())
-                {
-                    items.push_back(
-                        canvas::polygon(face.as_polygon())            //
-                        | canvas::outline_thickness(2.F)              //
-                        | canvas::fill_color(sf::Color::Transparent)  //
-                        | canvas::outline_color(sf::Color::Red));
-                }
-            }
-            if (m.dcel)
-            {
-                for (const auto& face : m.dcel->faces())
-                {
-                    items.push_back(
-                        canvas::polygon(face.as_polygon())            //
-                        | canvas::outline_thickness(2.F)              //
-                        | canvas::fill_color(sf::Color::Transparent)  //
-                        | canvas::outline_color(sf::Color::White));
-                }
-            }
-            items.push_back(canvas::transform(
-                [](const zx::mat::vector_t<float, 2>& p) -> canvas::CanvasItem
-                { return canvas::point(p, 5.F) | canvas::fill_color(sf::Color::Yellow); },
-                m.points));
-
-            return canvas::group(std::move(items));
-        });
     app.on_msg = [](sf::RenderWindow& w, const Command& cmd)
     {
         if (const auto c = std::get_if<Commands::Exit>(&cmd))
@@ -223,7 +109,21 @@ void run(const std::vector<std::string_view> args)
             }
             return {};
         });
+    return app;
+}
 
+void run(const std::vector<std::string_view> args)
+{
+    const std::string fonts_dir = R"(/mnt/c/Windows/Fonts/)";
+
+    auto window = sf::RenderWindow(sf::VideoMode({ 1024, 768 }), "CMake SFML Project");
+    const auto desktop_size = sf::VideoMode::getDesktopMode().size;
+    window.setPosition(get_center(desktop_size, window.getSize()));
+
+    const sf::Font font = load_font(fonts_dir + "arial.ttf");
+
+    auto app = create_app(window);
+    app.render = render_model<Model>(font, Render{});
     app.run();
 }
 

@@ -63,16 +63,41 @@ struct Context
     sf::RenderTarget& target;
 };
 
-struct CanvasItem : public std::function<void(Context&, const State&)>
+struct DrawOp : public std::function<void(Context&, const State&)>
 {
     using base_t = std::function<void(Context&, const State&)>;
     using base_t::base_t;
 };
 
-struct StateModifier : public std::function<void(State&)>
+struct StateModifier
 {
-    using base_t = std::function<void(State&)>;
-    using base_t::base_t;
+    using Modifier = std::function<void(State&)>;
+
+    template <class... M>
+    StateModifier(M&&... modifiers) : m_modifiers{ std::forward<M>(modifiers)... }
+    {
+    }
+
+    void operator()(State& state) const
+    {
+        for (const auto& modifier : m_modifiers)
+        {
+            modifier(state);
+        }
+    }
+
+    friend auto operator|(StateModifier lhs, StateModifier rhs) -> StateModifier
+    {
+        lhs.m_modifiers.reserve(lhs.m_modifiers.size() + rhs.m_modifiers.size());
+        lhs.m_modifiers.insert(
+            lhs.m_modifiers.end(),
+            std::make_move_iterator(rhs.m_modifiers.begin()),
+            std::make_move_iterator(rhs.m_modifiers.end()));
+        return lhs;
+    }
+
+private:
+    std::vector<Modifier> m_modifiers;
 };
 
 struct StyleModifier : public std::function<void(Style&)>
@@ -93,18 +118,9 @@ struct RenderStatesModifier : public std::function<void(sf::RenderStates&)>
     using base_t::base_t;
 };
 
-inline auto operator|(const StateModifier& lhs, const StateModifier& rhs) -> StateModifier
+inline auto operator|(DrawOp item, StateModifier modifier) -> DrawOp
 {
-    return [=](State& state)
-    {
-        lhs(state);
-        rhs(state);
-    };
-}
-
-inline auto operator|(const CanvasItem& item, const StateModifier& modifier) -> CanvasItem
-{
-    return [=](Context& ctx, const State& state)
+    return [item = std::move(item), modifier = std::move(modifier)](Context& ctx, const State& state)
     {
         State new_state = state;
         modifier(new_state);
@@ -121,17 +137,17 @@ inline void apply_style(sf::Shape& shape, const Style& style)
 
 inline auto modify_style(StyleModifier style_modifier) -> StateModifier
 {
-    return [=](State& state) { style_modifier(state.style); };
+    return [sm = std::move(style_modifier)](State& state) { sm(state.style); };
 }
 
 inline auto modify_text_style(TextStyleModifier text_style_modifier) -> StateModifier
 {
-    return [=](State& state) { text_style_modifier(state.text_style); };
+    return [tsm = std::move(text_style_modifier)](State& state) { tsm(state.text_style); };
 }
 
 inline auto modify_render_states(RenderStatesModifier render_states_modifier) -> StateModifier
 {
-    return [=](State& state) { render_states_modifier(state.render_states); };
+    return [rsm = std::move(render_states_modifier)](State& state) { rsm(state.render_states); };
 }
 
 inline auto text_style(std::uint32_t value) -> StateModifier
@@ -214,12 +230,12 @@ inline auto rotate(float a, const zx::mat::vector_t<float, 2>& pivot) -> StateMo
     return translate(pivot) | rotate(a) | translate(-pivot);
 }
 
-inline auto empty_item() -> CanvasItem
+inline auto empty_item() -> DrawOp
 {
     return [](Context&, const State&) {};
 }
 
-inline auto group(std::vector<CanvasItem> items) -> CanvasItem
+inline auto group(std::vector<DrawOp> items) -> DrawOp
 {
     return [=](Context& ctx, const State& state)
     {
@@ -231,17 +247,17 @@ inline auto group(std::vector<CanvasItem> items) -> CanvasItem
 }
 
 template <class... Tail>
-auto group(CanvasItem head, Tail... tail) -> CanvasItem
+auto group(DrawOp head, Tail... tail) -> DrawOp
 {
-    std::vector<CanvasItem> items{ std::move(head), CanvasItem(std::move(tail))... };
+    std::vector<DrawOp> items{ std::move(head), DrawOp(std::move(tail))... };
     return group(std::move(items));
 }
 
 template <class Func, class Range>
-auto transform(Func&& func, Range&& range) -> CanvasItem
+auto transform(Func&& func, Range&& range) -> DrawOp
 {
-    std::vector<CanvasItem> items;
-    for (const auto& item : range)
+    std::vector<DrawOp> items;
+    for (auto&& item : range)
     {
         items.push_back(std::invoke(func, item));
     }
@@ -249,12 +265,12 @@ auto transform(Func&& func, Range&& range) -> CanvasItem
 }
 
 template <class Func, class Range>
-auto transform_maybe(Func&& func, Range&& range) -> CanvasItem
+auto transform_maybe(Func&& func, Range&& range) -> DrawOp
 {
-    std::vector<CanvasItem> items;
-    for (const auto& item : range)
+    std::vector<DrawOp> items;
+    for (auto&& item : range)
     {
-        std::optional<CanvasItem> res = std::invoke(func, item);
+        std::optional<DrawOp> res = std::invoke(func, item);
         if (res)
         {
             items.push_back(*std::move(res));
@@ -263,7 +279,7 @@ auto transform_maybe(Func&& func, Range&& range) -> CanvasItem
     return group(std::move(items));
 }
 
-inline auto text(const sf::String& str) -> CanvasItem
+inline auto text(const sf::String& str) -> DrawOp
 {
     return [=](Context& ctx, const State& state)
     {
@@ -279,7 +295,7 @@ inline auto text(const sf::String& str) -> CanvasItem
     };
 }
 
-inline auto rect(const zx::mat::vector_t<float, 2>& size) -> CanvasItem
+inline auto rect(const zx::mat::vector_t<float, 2>& size) -> DrawOp
 {
     return [=](Context& ctx, const State& state)
     {
@@ -289,7 +305,7 @@ inline auto rect(const zx::mat::vector_t<float, 2>& size) -> CanvasItem
     };
 }
 
-inline auto circle(float r) -> CanvasItem
+inline auto circle(float r) -> DrawOp
 {
     return [=](Context& ctx, const State& state)
     {
@@ -299,17 +315,17 @@ inline auto circle(float r) -> CanvasItem
     };
 }
 
-inline auto circle(const zx::mat::spherical_shape_t<float, 2>& c) -> CanvasItem
+inline auto circle(const zx::mat::spherical_shape_t<float, 2>& c) -> DrawOp
 {
     return circle(c.radius) | translate(c.center - zx::mat::vector_t<float, 2>{ c.radius, c.radius });
 }
 
-inline auto point(const zx::mat::vector_t<float, 2>& p, float radius = 3.F) -> canvas::CanvasItem
+inline auto point(const zx::mat::vector_t<float, 2>& p, float radius = 3.F) -> canvas::DrawOp
 {
     return circle(zx::mat::spherical_shape_t<float, 2>{ p, radius });
 }
 
-inline auto sprite(const sf::Texture& texture, const sf::IntRect& rect) -> CanvasItem
+inline auto sprite(const sf::Texture& texture, const sf::IntRect& rect) -> DrawOp
 {
     return [&texture, rect](Context& ctx, const State& state)
     {
@@ -319,7 +335,7 @@ inline auto sprite(const sf::Texture& texture, const sf::IntRect& rect) -> Canva
     };
 }
 
-inline auto grid(const zx::mat::vector_t<float, 2>& size, const zx::mat::vector_t<float, 2>& dist) -> CanvasItem
+inline auto grid(const zx::mat::vector_t<float, 2>& size, const zx::mat::vector_t<float, 2>& dist) -> DrawOp
 {
     return [=](Context& ctx, const State& state)
     {
@@ -344,7 +360,7 @@ inline auto grid(const zx::mat::vector_t<float, 2>& size, const zx::mat::vector_
     };
 }
 
-inline auto triangle(const std::array<zx::mat::vector_t<float, 2>, 3>& vertices) -> CanvasItem
+inline auto triangle(const std::array<zx::mat::vector_t<float, 2>, 3>& vertices) -> DrawOp
 {
     return [=](Context& ctx, const State& state)
     {
@@ -361,12 +377,12 @@ inline auto triangle(const std::array<zx::mat::vector_t<float, 2>, 3>& vertices)
 
 inline auto triangle(
     const zx::mat::vector_t<float, 2>& a, const zx::mat::vector_t<float, 2>& b, const zx::mat::vector_t<float, 2>& c)
-    -> CanvasItem
+    -> DrawOp
 {
     return triangle({ a, b, c });
 }
 
-inline auto polygon(const std::vector<zx::mat::vector_t<float, 2>>& vertices) -> CanvasItem
+inline auto polygon(const std::vector<zx::mat::vector_t<float, 2>>& vertices) -> DrawOp
 {
     return [=](Context& ctx, const State& state)
     {
@@ -381,17 +397,17 @@ inline auto polygon(const std::vector<zx::mat::vector_t<float, 2>>& vertices) ->
     };
 }
 
-inline auto shape(const zx::mat::spherical_shape_t<float, 2>& item) -> CanvasItem
+inline auto shape(const zx::mat::spherical_shape_t<float, 2>& item) -> DrawOp
 {
     return circle(item);
 }
 
-inline auto shape(const zx::mat::triangle_t<float, 2>& item) -> CanvasItem
+inline auto shape(const zx::mat::triangle_t<float, 2>& item) -> DrawOp
 {
     return triangle(item);
 }
 
-inline auto shape(const zx::mat::segment_t<float, 2>& item) -> CanvasItem
+inline auto shape(const zx::mat::segment_t<float, 2>& item) -> DrawOp
 {
     return [=](Context& ctx, const State& state)
     {
@@ -405,7 +421,7 @@ inline auto shape(const zx::mat::segment_t<float, 2>& item) -> CanvasItem
     };
 }
 
-inline auto shape(const zx::mat::vector_t<float, 2>& item) -> CanvasItem
+inline auto shape(const zx::mat::vector_t<float, 2>& item) -> DrawOp
 {
     return point(item);
 }

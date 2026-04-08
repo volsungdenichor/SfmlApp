@@ -142,18 +142,23 @@ struct App
             { return event_handler(m, *static_cast<const Event*>(ptr)); });
     }
 
-    template <class Event>
-    void publish_event(const Event& event)
+    void publish_event(std::type_index event_type, const void* event)
     {
-        const auto [b, e] = m_subscriptions.equal_range(std::type_index{ typeid(Event) });
+        const auto [b, e] = m_subscriptions.equal_range(event_type);
         for (auto it = b; it != e; ++it)
         {
             const auto& update_fn = it->second;
-            const std::optional<Msg> maybe_msg = it->second(m_model_state, static_cast<const void*>(&event));
+            const std::optional<Msg> maybe_msg = it->second(m_model_state, event);
             if (maybe_msg)
             {
                 m_msg_queue.push_back(*maybe_msg);
             }
         }
+    }
+
+    template <class Event>
+    void publish_event(const Event& event)
+    {
+        publish_event(std::type_index{ typeid(Event) }, static_cast<const void*>(&event));
     }
 };
