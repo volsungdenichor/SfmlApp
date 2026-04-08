@@ -55,9 +55,18 @@ inline auto get_center(sf::Vector2u desktop_size, sf::Vector2u window_size) -> s
     return { (int)(desktop_size.x / 2 - window_size.x / 2), (int)(desktop_size.y / 2 - window_size.y / 2) };
 }
 
-inline auto create_app(sf::RenderWindow& window) -> App<Model, Command>
+inline auto create_model() -> Model
 {
-    auto app = App<Model, Command>{ window, Model{} };
+    Model model = {};
+    model.points_model.points = {
+        { 50.F, anim::ping_pong(anim::gradual(0.F, 500.F, anim::duration_t{ 1 }, anim::ease::none), 10.0F) },
+    };
+    return model;
+}
+
+inline auto create_app(sf::RenderWindow& window, Model model) -> App<Model, Command>
+{
+    auto app = App<Model, Command>{ window, std::move(model) };
     app.frame_duration = duration_t{ 0.01F };
     app.on_msg = [](sf::RenderWindow& w, const Command& cmd)
     {
@@ -77,8 +86,8 @@ inline auto create_app(sf::RenderWindow& window) -> App<Model, Command>
         }
         else if (const auto c = std::get_if<Commands::AddPoint>(&cmd))
         {
-            m.points.push_back(c->pos);
-            m.update();
+            m.dcel_model.points.push_back(c->pos);
+            m.dcel_model.update();
             return {};
         }
         else if (const auto c = std::get_if<Commands::Init>(&cmd))
@@ -90,7 +99,16 @@ inline auto create_app(sf::RenderWindow& window) -> App<Model, Command>
 
     app.subscribe<InitEvent>([](Model& m, const InitEvent&) -> std::optional<Command> { return Commands::Init{}; });
 
-    app.subscribe<TickEvent>([](Model& m, const TickEvent& event) -> std::optional<Command> { return {}; });
+    app.subscribe<TickEvent>(
+        [](Model& m, const TickEvent& event) -> std::optional<Command>
+        {
+            m.points_model.time_point += event.elapsed;
+            for (auto& point : m.points_model.points)
+            {
+                point.pos = zx::mat::vector_t<float, 2>{ point.animation(m.points_model.time_point), point.y };
+            }
+            return {};
+        });
     app.subscribe<sf::Event::KeyPressed>(
         [](Model& m, const sf::Event::KeyPressed& e) -> std::optional<Command>
         {
@@ -122,7 +140,7 @@ void run(const std::vector<std::string_view> args)
 
     const sf::Font font = load_font(fonts_dir + "arial.ttf");
 
-    auto app = create_app(window);
+    auto app = create_app(window, create_model());
     app.render = render_model<Model>(font, Render{});
     app.run();
 }

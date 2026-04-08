@@ -73,10 +73,13 @@ struct StateModifier
 {
     using Modifier = std::function<void(State&)>;
 
-    template <class... M>
-    StateModifier(M&&... modifiers) : m_modifiers{ std::forward<M>(modifiers)... }
+    template <class M>
+    StateModifier(M&& modifier) : m_modifiers{ std::forward<M>(modifier) }
     {
     }
+
+    StateModifier(const StateModifier&) = default;
+    StateModifier(StateModifier&&) noexcept = default;
 
     void operator()(State& state) const
     {
