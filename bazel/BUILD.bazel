@@ -1,0 +1,38 @@
+load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
+
+# Builds SFML 3.0.1 from source using its own CMake configuration.
+# Only the Graphics, Window, and System modules are built (Audio and Network
+# are disabled to mirror the CMake setup which only links sfml-graphics).
+#
+# Required system packages on Debian/Ubuntu:
+#   sudo apt-get install \
+#       libgl-dev libx11-dev libxrandr-dev libxcursor-dev libxi-dev \
+#       libfreetype-dev libudev-dev
+cmake(
+    name = "sfml",
+    lib_source = "@sfml_src//:all_srcs",
+    generate_args = [
+        "-DBUILD_SHARED_LIBS=OFF",
+        "-DSFML_BUILD_AUDIO=OFF",
+        "-DSFML_BUILD_NETWORK=OFF",
+        "-DSFML_BUILD_EXAMPLES=OFF",
+        "-DSFML_BUILD_DOC=OFF",
+        "-DSFML_BUILD_TEST_SUITE=OFF",
+    ],
+    out_static_libs = [
+        "libsfml-graphics-s.a",
+        "libsfml-window-s.a",
+        "libsfml-system-s.a",
+    ],
+    # System libraries that SFML's static build requires on Linux.
+    linkopts = [
+        "-lGL",
+        "-lX11",
+        "-lXrandr",
+        "-lXcursor",
+        "-lXi",
+        "-lfreetype",
+        "-ludev",
+    ],
+    visibility = ["//visibility:public"],
+)

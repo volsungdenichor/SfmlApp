@@ -1,0 +1,20 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary")
+
+ZX_DEPS = [
+    "@zx//:sequence",
+    "@zx//:functional",
+    "@zx//:mat",
+    "@zx//:geometry",
+]
+
+cc_binary(
+    name = "main",
+    srcs = glob(["src/*.cpp", "src/*.hpp"]),
+    copts = [
+        "-std=c++17",
+        "-O3",
+    ],
+    deps = [
+        "//bazel:sfml",
+    ] + ZX_DEPS,
+)

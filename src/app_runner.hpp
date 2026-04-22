@@ -148,8 +148,7 @@ struct App
         for (auto it = b; it != e; ++it)
         {
             const auto& update_fn = it->second;
-            const std::optional<Msg> maybe_msg = it->second(m_model_state, event);
-            if (maybe_msg)
+            if (const std::optional<Msg> maybe_msg = update_fn(m_model_state, event); maybe_msg.has_value())
             {
                 m_msg_queue.push_back(*maybe_msg);
             }

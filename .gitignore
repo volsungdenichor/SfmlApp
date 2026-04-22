@@ -1,1 +1,6 @@
-build/*
+# CMake
+build/
+
+# Bazel
+bazel-*
+build.log

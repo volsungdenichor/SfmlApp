@@ -1,0 +1,48 @@
+module(
+    name = "sfml_app",
+    version = "0.1.0",
+)
+
+bazel_dep(name = "rules_cc", version = "0.2.17")
+bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
+
+# Use system-installed cmake/make/pkg-config instead of building them from
+# source inside the sandbox (which fails on some Linux configurations).
+foreign_cc_ext = use_extension(
+    "@rules_foreign_cc//foreign_cc:extensions.bzl",
+    "foreign_cc_extension",
+)
+foreign_cc_ext.settings(
+    register_built_tools = False,
+    register_default_tools = True,
+    register_preinstalled_tools = True,
+)
+
+# zx is not in the Bazel Central Registry, so override it to pull from Git.
+# The four modules used by this project (sequence, functional, mat, geometry)
+# are declared as deps in //BUILD.bazel; only those modules get built.
+#
+# To pin to a specific commit, replace archive_override with git_override:
+#   git_override(module_name = "zx", remote = "git@github.com:volsungdenichor/zx.git", commit = "<hash>")
+#
+# To use a local checkout instead, replace with local_path_override:
+#   local_path_override(module_name = "zx", path = "../zx")
+#
+# To pin the integrity hash (recommended for reproducible builds), run:
+#   bazel fetch //...
+# Bazel will print the correct sha256 in the error and you can add:
+#   integrity = "sha256-<base64-encoded-hash>",
+bazel_dep(name = "zx", version = "1.0.0")
+archive_override(
+    module_name = "zx",
+    urls = ["https://github.com/volsungdenichor/zx/archive/refs/heads/main.tar.gz"],
+    strip_prefix = "zx-main",
+)
+
+# Register the rules_foreign_cc preinstalled pkg-config toolchain with higher
+# priority than the default build-from-source one, to avoid BootstrapPkgConfig.
+register_toolchains("@rules_foreign_cc//toolchains:preinstalled_pkgconfig_toolchain")
+
+# SFML is fetched via a module extension because it has no MODULE.bazel of its own.
+sfml_ext = use_extension("//bazel:sfml_extension.bzl", "sfml_extension")
+use_repo(sfml_ext, "sfml_src")
