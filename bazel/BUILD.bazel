@@ -24,7 +24,6 @@ cmake(
         "libsfml-window-s.a",
         "libsfml-system-s.a",
     ],
-    # System libraries that SFML's static build requires on Linux.
     linkopts = [
         "-lGL",
         "-lX11",
