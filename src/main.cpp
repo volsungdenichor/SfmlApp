@@ -108,7 +108,7 @@ inline auto create_app(sf::RenderWindow& window, Model model) -> App<Model, Comm
             m.points_model.time_point += event.elapsed;
             for (auto& point : m.points_model.points)
             {
-                point.pos = zx::mat::vector_t<float, 2>{ point.animation(m.points_model.time_point), point.y };
+                point.pos = zx::mat::vector_t<2, float>{ point.animation(m.points_model.time_point), point.y };
             }
             return {};
         });

@@ -9,27 +9,27 @@
 #include <zx/mat.hpp>
 
 template <class T>
-sf::Vector2<T> convert(const zx::mat::vector_t<T, 2>& v)
+sf::Vector2<T> convert(const zx::mat::vector_t<2, T>& v)
 {
     return sf::Vector2<T>(v[0], v[1]);
 }
 
 template <class U, class T>
-sf::Vector2<U> convert(const zx::mat::vector_t<T, 2>& v)
+sf::Vector2<U> convert(const zx::mat::vector_t<2, T>& v)
 {
     return sf::Vector2<U>(static_cast<U>(v[0]), static_cast<U>(v[1]));
 }
 
 template <class T>
-zx::mat::vector_t<T, 2> convert(const sf::Vector2<T>& v)
+zx::mat::vector_t<2, T> convert(const sf::Vector2<T>& v)
 {
-    return zx::mat::vector_t<T, 2>{ v.x, v.y };
+    return zx::mat::vector_t<2, T>{ v.x, v.y };
 }
 
 template <class U, class T>
-zx::mat::vector_t<U, 2> convert_as(const sf::Vector2<T>& v)
+zx::mat::vector_t<2, U> convert_as(const sf::Vector2<T>& v)
 {
-    return zx::mat::vector_t<U, 2>{ static_cast<U>(v.x), static_cast<U>(v.y) };
+    return zx::mat::vector_t<2, U>{ static_cast<U>(v.x), static_cast<U>(v.y) };
 }
 
 namespace canvas
@@ -208,17 +208,17 @@ inline auto blend(sf::BlendMode mode) -> StateModifier
     return modify_render_states([=](sf::RenderStates& render_states) { render_states.blendMode = mode; });
 }
 
-inline auto translate(const zx::mat::vector_t<float, 2>& v) -> StateModifier
+inline auto translate(const zx::mat::vector_t<2, float>& v) -> StateModifier
 {
     return modify_render_states([=](sf::RenderStates& render_states) { render_states.transform.translate(convert(v)); });
 }
 
-inline auto scale(const zx::mat::vector_t<float, 2>& v) -> StateModifier
+inline auto scale(const zx::mat::vector_t<2, float>& v) -> StateModifier
 {
     return modify_render_states([=](sf::RenderStates& render_states) { render_states.transform.scale(convert(v)); });
 }
 
-inline auto scale(const zx::mat::vector_t<float, 2>& v, const zx::mat::vector_t<float, 2>& pivot) -> StateModifier
+inline auto scale(const zx::mat::vector_t<2, float>& v, const zx::mat::vector_t<2, float>& pivot) -> StateModifier
 {
     return translate(pivot) | scale(v) | translate(-pivot);
 }
@@ -228,7 +228,7 @@ inline auto rotate(float a) -> StateModifier
     return modify_render_states([=](sf::RenderStates& render_states) { render_states.transform.rotate(sf::radians(a)); });
 }
 
-inline auto rotate(float a, const zx::mat::vector_t<float, 2>& pivot) -> StateModifier
+inline auto rotate(float a, const zx::mat::vector_t<2, float>& pivot) -> StateModifier
 {
     return translate(pivot) | rotate(a) | translate(-pivot);
 }
@@ -298,7 +298,7 @@ inline auto text(const sf::String& str) -> DrawOp
     };
 }
 
-inline auto rect(const zx::mat::vector_t<float, 2>& size) -> DrawOp
+inline auto rect(const zx::mat::vector_t<2, float>& size) -> DrawOp
 {
     return [=](Context& ctx, const State& state)
     {
@@ -318,14 +318,14 @@ inline auto circle(float r) -> DrawOp
     };
 }
 
-inline auto circle(const zx::mat::spherical_shape_t<float, 2>& c) -> DrawOp
+inline auto circle(const zx::mat::circle_t<float>& c) -> DrawOp
 {
-    return circle(c.radius) | translate(c.center - zx::mat::vector_t<float, 2>{ c.radius, c.radius });
+    return circle(c.radius) | translate(c.center - zx::mat::vector_t<2, float>{ c.radius, c.radius });
 }
 
-inline auto point(const zx::mat::vector_t<float, 2>& p, float radius = 3.F) -> canvas::DrawOp
+inline auto point(const zx::mat::vector_t<2, float>& p, float radius = 3.F) -> canvas::DrawOp
 {
-    return circle(zx::mat::spherical_shape_t<float, 2>{ p, radius });
+    return circle(zx::mat::circle_t<float>{ p, radius });
 }
 
 inline auto sprite(const sf::Texture& texture, const sf::IntRect& rect) -> DrawOp
@@ -338,7 +338,7 @@ inline auto sprite(const sf::Texture& texture, const sf::IntRect& rect) -> DrawO
     };
 }
 
-inline auto grid(const zx::mat::vector_t<float, 2>& size, const zx::mat::vector_t<float, 2>& dist) -> DrawOp
+inline auto grid(const zx::mat::vector_t<2, float>& size, const zx::mat::vector_t<2, float>& dist) -> DrawOp
 {
     return [=](Context& ctx, const State& state)
     {
@@ -363,7 +363,7 @@ inline auto grid(const zx::mat::vector_t<float, 2>& size, const zx::mat::vector_
     };
 }
 
-inline auto triangle(const std::array<zx::mat::vector_t<float, 2>, 3>& vertices) -> DrawOp
+inline auto triangle(const std::array<zx::mat::vector_t<2, float>, 3>& vertices) -> DrawOp
 {
     return [=](Context& ctx, const State& state)
     {
@@ -379,13 +379,13 @@ inline auto triangle(const std::array<zx::mat::vector_t<float, 2>, 3>& vertices)
 }
 
 inline auto triangle(
-    const zx::mat::vector_t<float, 2>& a, const zx::mat::vector_t<float, 2>& b, const zx::mat::vector_t<float, 2>& c)
+    const zx::mat::vector_t<2, float>& a, const zx::mat::vector_t<2, float>& b, const zx::mat::vector_t<2, float>& c)
     -> DrawOp
 {
     return triangle({ a, b, c });
 }
 
-inline auto polygon(const std::vector<zx::mat::vector_t<float, 2>>& vertices) -> DrawOp
+inline auto polygon(const std::vector<zx::mat::vector_t<2, float>>& vertices) -> DrawOp
 {
     return [=](Context& ctx, const State& state)
     {
@@ -400,17 +400,17 @@ inline auto polygon(const std::vector<zx::mat::vector_t<float, 2>>& vertices) ->
     };
 }
 
-inline auto shape(const zx::mat::spherical_shape_t<float, 2>& item) -> DrawOp
+inline auto shape(const zx::mat::circle_t<float>& item) -> DrawOp
 {
     return circle(item);
 }
 
-inline auto shape(const zx::mat::triangle_t<float, 2>& item) -> DrawOp
+inline auto shape(const zx::mat::triangle_t<2, float>& item) -> DrawOp
 {
     return triangle(item);
 }
 
-inline auto shape(const zx::mat::segment_t<float, 2>& item) -> DrawOp
+inline auto shape(const zx::mat::segment_t<2, float>& item) -> DrawOp
 {
     return [=](Context& ctx, const State& state)
     {
@@ -424,7 +424,7 @@ inline auto shape(const zx::mat::segment_t<float, 2>& item) -> DrawOp
     };
 }
 
-inline auto shape(const zx::mat::vector_t<float, 2>& item) -> DrawOp
+inline auto shape(const zx::mat::vector_t<2, float>& item) -> DrawOp
 {
     return point(item);
 }

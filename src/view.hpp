@@ -36,7 +36,7 @@ struct Render
             }
         }
         items.push_back(canvas::transform(
-            [this](const zx::mat::vector_t<float, 2>& p) -> canvas::DrawOp
+            [this](const zx::mat::vector_t<2, float>& p) -> canvas::DrawOp
             { return canvas::point(p, 5.F) | canvas::fill_color(point_fill_color); },
             m.points));
 

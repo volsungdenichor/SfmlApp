@@ -13,9 +13,9 @@ struct Boid
 {
     struct Linear
     {
-        zx::mat::vector_t<float, 2> location = {};
-        zx::mat::vector_t<float, 2> velocity = {};
-        zx::mat::vector_t<float, 2> accelarion = {};
+        zx::mat::vector_t<2, float> location = {};
+        zx::mat::vector_t<2, float> velocity = {};
+        zx::mat::vector_t<2, float> accelarion = {};
     };
     struct Angular
     {
@@ -41,32 +41,24 @@ struct Boid
 
 struct DcelModel
 {
-    std::vector<zx::mat::vector_t<float, 2>> points = {};
+    std::vector<zx::mat::vector_t<2, float>> points = {};
     std::optional<zx::geometry::dcel_t<float>> dcel = {};
     std::optional<zx::geometry::dcel_t<float>> voronoi = {};
 
     void update()
     {
-        try
-        {
-            dcel = zx::geometry::triangulate(points);
-        }
-        catch (const std::exception& e)
-        {
-            // std::cout << "error on triangulation: " << e.what() << '\n';
-            dcel = std::nullopt;
-        }
-        if (dcel)
-        {
-            try
-            {
-                voronoi = zx::geometry::voronoi(*dcel);
-            }
-            catch (const std::exception& e)
-            {
-                voronoi = std::nullopt;
-            }
-        }
+        dcel = std::nullopt;
+        voronoi = std::nullopt;
+
+        zx::geometry::triangulate(points)
+            .transform(
+                [&](const zx::geometry::dcel_t<float>& t)
+                {
+                    dcel = t;
+                    return t;
+                })
+            .and_then(zx::geometry::tesselate)
+            .transform([&](const zx::geometry::dcel_t<float>& t) { voronoi = t; });
     }
 };
 
@@ -76,7 +68,7 @@ struct PointsModel
     {
         float y;
         anim::animation<float> animation = anim::constant(0.F, 100.F);
-        zx::mat::vector_t<float, 2> pos = {};
+        zx::mat::vector_t<2, float> pos = {};
     };
 
     std::vector<Point> points = {};
@@ -100,7 +92,7 @@ struct Exit
 };
 struct AddPoint
 {
-    zx::mat::vector_t<float, 2> pos;
+    zx::mat::vector_t<2, float> pos;
 };
 
 }  // namespace Commands
